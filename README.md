@@ -6,7 +6,7 @@ Application Windows de lumière ambiante : un halo qui suit les couleurs des app
 
 ## Installer
 
-Télécharger **HaloStudio-Setup-1.0.0-beta.2.exe** depuis les [versions publiées](https://github.com/hassan312-god/halo-studio/releases), puis ouvrir l’installateur. Installation pour le compte courant, raccourci dans le menu Démarrer et raccourci bureau facultatif. Pas de droits administrateur requis.
+Télécharger **HaloStudio-Setup-1.0.0-beta.3.exe** depuis les [versions publiées](https://github.com/hassan312-god/halo-studio/releases), puis ouvrir l’installateur. Installation pour le compte courant, raccourci dans le menu Démarrer et raccourci bureau facultatif. Pas de droits administrateur requis.
 
 L’aperçu à droite montre une capture locale en direct de l’écran actif. Le halo est plus visible sur les pages claires, les changements de couleur sont lissés et un reflet glisse doucement sur les bords. Le mode « vidéo uniquement » active le halo lorsqu’un contenu animé coloré est détecté. La luminosité matérielle du PC est réglable si Windows expose cette fonction.
 

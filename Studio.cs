@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -132,7 +132,9 @@ sealed class PreviewPanel : Control {
 
 sealed class SettingsCard : Panel {
     public SettingsCard(){DoubleBuffered=true;BackColor=Color.White;Padding=new Padding(15);}
-    protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);using(var pen=new Pen(Color.FromArgb(222,226,232)))e.Graphics.DrawRectangle(pen,0,0,Width-1,Height-1);}
+    static GraphicsPath Rounded(Rectangle r,int radius){var p=new GraphicsPath();int d=radius*2;p.AddArc(r.Left,r.Top,d,d,180,90);p.AddArc(r.Right-d,r.Top,d,d,270,90);p.AddArc(r.Right-d,r.Bottom-d,d,d,0,90);p.AddArc(r.Left,r.Bottom-d,d,d,90,90);p.CloseFigure();return p;}
+    protected override void OnResize(EventArgs e){base.OnResize(e);if(Width<24||Height<24)return;using(var path=Rounded(new Rectangle(0,0,Width,Height),12)){var old=Region;Region=new Region(path);if(old!=null)old.Dispose();}}
+    protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;using(var path=Rounded(new Rectangle(0,0,Width-1,Height-1),12))using(var pen=new Pen(Color.FromArgb(225,228,236)))e.Graphics.DrawPath(pen,path);}
 }
 
 sealed class StudioForm : Form {
@@ -145,9 +147,9 @@ sealed class StudioForm : Form {
         persist=probeBrightness;Settings=settings;Text="Halo Studio · "+BuildInfo.Version;ClientSize=new Size(1060,700);MinimumSize=new Size(900,620);StartPosition=FormStartPosition.CenterScreen;BackColor=Background;ForeColor=Ink;Font=new Font("Segoe UI",10);AutoScaleMode=AutoScaleMode.Dpi;Icon=Branding.AppIcon();
         rail=new Panel{Location=new Point(0,0),Size=new Size(190,700),Anchor=AnchorStyles.Left|AnchorStyles.Top|AnchorStyles.Bottom,BackColor=Color.FromArgb(239,240,246)};Controls.Add(rail);
         var logo=Branding.Logo();if(logo!=null)rail.Controls.Add(new PictureBox{Image=logo,SizeMode=PictureBoxSizeMode.Zoom,Location=new Point(10,14),Size=new Size(46,46)});
-        var brandLabel=LabelAt(rail,"Halo Studio",64,15,true,113,30);brandLabel.Font=new Font("Segoe UI",10,FontStyle.Bold);LabelAt(rail,"Version bêta 2",64,44,false,120,25);
+        var brandLabel=LabelAt(rail,"Halo Studio",64,15,true,113,30);brandLabel.Font=new Font("Segoe UI",10,FontStyle.Bold);LabelAt(rail,"Version bêta 3",64,44,false,120,25);
         string[] names={"Couleurs","Souris","Écran","Mises à jour"};
-        for(int i=0;i<names.Length;i++){int selected=i;var button=ButtonAt(rail,names[i],12,132+i*52,166);button.TextAlign=ContentAlignment.MiddleLeft;button.FlatAppearance.BorderSize=0;button.Click+=delegate{SelectPage(selected);};navigation.Add(button);}
+        for(int i=0;i<names.Length;i++){int selected=i;var button=ButtonAt(rail,names[i],12,132+i*52,166);button.TextAlign=ContentAlignment.MiddleLeft;button.FlatAppearance.BorderSize=0;using(var pill=new GraphicsPath()){pill.AddArc(0,0,24,24,180,90);pill.AddArc(button.Width-25,0,24,24,270,90);pill.AddArc(button.Width-25,button.Height-25,24,24,0,90);pill.AddArc(0,button.Height-25,24,24,90,90);pill.CloseFigure();button.Region=new Region(pill);}button.Click+=delegate{SelectPage(selected);};navigation.Add(button);}
         LabelAt(rail,"Local sur ton PC\nWindows 10 / 11",14,480,false,155,50);
         pageTitle=LabelAt(this,"Couleurs",211,30,true,620,46);pageTitle.Font=new Font("Segoe UI",25,FontStyle.Bold);
         pageSubtitle=LabelAt(this,"Une ambiance qui suit ton écran.",215,82,false,680,28);

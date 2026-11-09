@@ -1,6 +1,6 @@
-HALO STUDIO — 1.0.0-beta.2
+HALO STUDIO — 1.0.0-beta.3
 
-Installation : ouvrir HaloStudio-Setup-1.0.0-beta.2.exe.
+Installation : ouvrir HaloStudio-Setup-1.0.0-beta.3.exe.
 Ensuite, lancer Halo Studio depuis le menu Démarrer ou le raccourci bureau.
 Compatible Windows 10 (2004+) / Windows 11 et .NET Framework 4.8.
 Installation pour le compte courant, sans droits administrateur.
