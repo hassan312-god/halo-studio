@@ -1,0 +1,52 @@
+﻿HALO STUDIO — 1.0.0-beta.1
+
+Installation : ouvrir HaloStudio-Setup-1.0.0-beta.1.exe.
+Ensuite, lancer Halo Studio depuis le menu Démarrer ou le raccourci bureau.
+Compatible Windows 10 (2004+) / Windows 11 et .NET Framework 4.8.
+Installation pour le compte courant, sans droits administrateur.
+
+COULEURS
+Automatique : les halos suivent les couleurs des applications et vidéos.
+Couleur unique : choisir une teinte avec la palette ou le sélecteur.
+
+SOURIS
+Cinq styles, taille et intensité du contour lumineux réglables.
+La lueur est intégrée au curseur Windows : elle suit exactement sa forme.
+Les curseurs de texte, de lien et de redimensionnement restent ceux de Windows.
+À la pause ou à la fermeture, le pointeur d’origine est restauré.
+
+ÉCRAN
+Intensité du halo et étendue réglables, contraste renforcé sur les pages claires.
+Amplification vidéo automatique, ou maintenue via la case dédiée.
+Luminosité réelle du PC : disponible lorsque le pilote de l’écran le permet.
+Sur certains écrans externes, utiliser les boutons physiques de l’écran.
+La fenêtre s’adapte aux portables et PC ; un halo est dessiné sur chaque écran.
+
+APERÇU
+Le petit écran à droite montre les couleurs, les styles et les intensités.
+Le bouton Changer alterne fond clair et sombre.
+L’aperçu de luminosité physique est indicatif, car il dépend du matériel.
+
+MISES À JOUR
+Canal bêta, depuis https://github.com/hassan312-god/halo-studio/releases
+Vérification au démarrage puis toutes les six heures.
+Téléchargement des versions plus récentes ; empreinte SHA-256 vérifiée.
+En automatique, installation à la fermeture de l’application.
+Le bouton Installer et relancer permet de l’appliquer immédiatement.
+Les mises à jour automatiques peuvent être désactivées dans l’application.
+
+Ctrl + Alt + Maj + H : pause / reprise
+Ctrl + Alt + Maj + Q : quitter
+Fermer la fenêtre conserve Halo actif dans les icônes près de l’horloge.
+Quitter Halo arrête les effets et restaure le pointeur.
+
+Aucune image d’écran n’est enregistrée ou transmise. Seules les vérifications
+et les téléchargements de mises à jour utilisent Internet (GitHub).
+Les préférences sont dans %LOCALAPPDATA%\HaloStudio\reglages.xml.
+Désinstallation : Paramètres Windows > Applications > Halo Studio (bêta).
+Les préférences sont conservées pour une éventuelle réinstallation.
+
+Les vidéos protégées, certains pleins écrans exclusifs et l’écran verrouillé
+peuvent empêcher l’effet. À luminosité maximale, le halo ne peut pas dépasser
+la luminosité physique de l’écran. Cette bêta n’est pas signée Authenticode :
+Windows peut afficher un avertissement d’éditeur inconnu.

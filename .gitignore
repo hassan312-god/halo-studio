@@ -1,0 +1,9 @@
+build/
+*.exe
+*.cur
+*.log
+preferences.txt
+reglages.xml
+reglages.xml.tmp
+*.previous
+*.part

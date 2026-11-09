@@ -1,0 +1,36 @@
+name: Build Windows beta
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile app and installer
+        shell: pwsh
+        run: ./Build-Installer.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HaloStudio-Windows
+          path: |
+            build/HaloStudio-Setup-*.exe
+            build/*.sha256
+      - name: Publish tagged beta
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = (Select-String -Path BuildInfo.cs -Pattern 'Version="([^"]+)"').Matches[0].Groups[1].Value
+          if ($env:GITHUB_REF_NAME -ne "v$version") { throw 'Tag and application version differ.' }
+          gh release view $env:GITHUB_REF_NAME *> $null
+          if ($LASTEXITCODE -eq 0) { Write-Output 'This release is already published.'; exit 0 }
+          $files = Get-ChildItem build/HaloStudio-Setup-*.exe,build/*.sha256 | ForEach-Object FullName
+          gh release create $env:GITHUB_REF_NAME @files --title "Halo Studio $version" --prerelease --generate-notes
