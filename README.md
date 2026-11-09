@@ -2,11 +2,11 @@
 
 <img src="logo.png" width="120" alt="Halo Studio">
 
-Application Windows de lumière ambiante : un halo qui suit les couleurs des applications et des vidéos, avec cinq pointeurs à contour lumineux.
+Application Windows de lumière ambiante : un halo qui suit les couleurs des applications et des vidéos, avec huit pointeurs à contour lumineux.
 
 ## Installer
 
-Télécharger **HaloStudio-Setup-1.0.0-beta.1.exe** depuis les [versions publiées](https://github.com/hassan312-god/halo-studio/releases), puis ouvrir l’installateur. Installation pour le compte courant, raccourci dans le menu Démarrer et raccourci bureau facultatif. Pas de droits administrateur requis.
+Télécharger **HaloStudio-Setup-1.0.0-beta.2.exe** depuis les [versions publiées](https://github.com/hassan312-god/halo-studio/releases), puis ouvrir l’installateur. Installation pour le compte courant, raccourci dans le menu Démarrer et raccourci bureau facultatif. Pas de droits administrateur requis.
 
 Windows 10 version 2004 ou ultérieure / Windows 11, .NET Framework 4.8 (fourni avec ces versions de Windows). PC portable ou de bureau, un ou plusieurs écrans.
 

@@ -1,6 +1,6 @@
-﻿HALO STUDIO — 1.0.0-beta.1
+HALO STUDIO — 1.0.0-beta.2
 
-Installation : ouvrir HaloStudio-Setup-1.0.0-beta.1.exe.
+Installation : ouvrir HaloStudio-Setup-1.0.0-beta.2.exe.
 Ensuite, lancer Halo Studio depuis le menu Démarrer ou le raccourci bureau.
 Compatible Windows 10 (2004+) / Windows 11 et .NET Framework 4.8.
 Installation pour le compte courant, sans droits administrateur.
@@ -10,7 +10,7 @@ Automatique : les halos suivent les couleurs des applications et vidéos.
 Couleur unique : choisir une teinte avec la palette ou le sélecteur.
 
 SOURIS
-Cinq styles, taille et intensité du contour lumineux réglables.
+Huit styles, taille et intensité du contour lumineux réglables.
 La lueur est intégrée au curseur Windows : elle suit exactement sa forme.
 Les curseurs de texte, de lien et de redimensionnement restent ceux de Windows.
 À la pause ou à la fermeture, le pointeur d’origine est restauré.

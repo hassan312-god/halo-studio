@@ -16,7 +16,7 @@ public sealed class HaloSettings {
     public Color FixedColor {get{return Color.FromArgb(ColorArgb);}}
     public static string DataDirectory {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"HaloStudio");}}
     public static string FileName {get{return Path.Combine(DataDirectory,"reglages.xml");}}
-    public void Normalize(){ScreenIntensity=Clamp(ScreenIntensity,0,100);PointerIntensity=Clamp(PointerIntensity,0,100);PointerStyle=Clamp(PointerStyle,0,4);PointerSize=Clamp(PointerSize,80,160);Width=Clamp(Width,50,180);ColorArgb=Color.FromArgb(255,FixedColor.R,FixedColor.G,FixedColor.B).ToArgb();}
+    public void Normalize(){ScreenIntensity=Clamp(ScreenIntensity,0,100);PointerIntensity=Clamp(PointerIntensity,0,100);PointerStyle=Clamp(PointerStyle,0,7);PointerSize=Clamp(PointerSize,80,160);Width=Clamp(Width,50,180);ColorArgb=Color.FromArgb(255,FixedColor.R,FixedColor.G,FixedColor.B).ToArgb();}
     static int Clamp(int x,int min,int max){return Math.Max(min,Math.Min(max,x));}
     public static HaloSettings Load(){
         try{using(var stream=File.OpenRead(FileName)){var s=(HaloSettings)new XmlSerializer(typeof(HaloSettings)).Deserialize(stream);s.Normalize();return s;}}catch{}
@@ -33,8 +33,8 @@ static class Branding {
 }
 
 static class PointerArt {
-    public static readonly string[] Names={"Pointe douce","Flèche classique","Flèche fine","Diamant","Croix précise"};
-    public static Point Hotspot(int style,int size){double scale=size/100.0;return style>=3?new Point((int)(32*scale),(int)(32*scale)):new Point((int)(17*scale),(int)(14*scale));}
+    public static readonly string[] Names={"Pointe douce","Flèche classique","Flèche fine","Diamant","Croix précise","Flèche contrastée","Chevron lumineux","Pointe futuriste"};
+    public static Point Hotspot(int style,int size){double scale=size/100.0;return style==3||style==4?new Point((int)(32*scale),(int)(32*scale)):new Point((int)(17*scale),(int)(14*scale));}
     static GraphicsPath Shape(int style){
         var p=new GraphicsPath();
         if(style==0)p.AddPolygon(new[]{new PointF(0,0),new PointF(25,9),new PointF(15,16),new PointF(9,29)});
@@ -42,6 +42,9 @@ static class PointerArt {
         if(style==2)p.AddPolygon(new[]{new PointF(0,0),new PointF(9,29),new PointF(13,17),new PointF(28,11)});
         if(style==3)p.AddPolygon(new[]{new PointF(15,2),new PointF(26,18),new PointF(15,34),new PointF(4,18)});
         if(style==4)p.AddPolygon(new[]{new PointF(12,2),new PointF(18,2),new PointF(18,15),new PointF(30,15),new PointF(30,21),new PointF(18,21),new PointF(18,34),new PointF(12,34),new PointF(12,21),new PointF(0,21),new PointF(0,15),new PointF(12,15)});
+        if(style==5)p.AddPolygon(new[]{new PointF(0,0),new PointF(2,32),new PointF(10,25),new PointF(15,36),new PointF(23,32),new PointF(17,21),new PointF(29,20)});
+        if(style==6)p.AddPolygon(new[]{new PointF(0,0),new PointF(11,18),new PointF(0,35),new PointF(9,30),new PointF(18,18),new PointF(9,6)});
+        if(style==7)p.AddPolygon(new[]{new PointF(0,0),new PointF(31,17),new PointF(5,33),new PointF(11,18)});
         using(var m=new Matrix()){m.Translate(17,14);p.Transform(m);}return p;
     }
     public static Bitmap Render(int style,Color color,int intensity,int size){
@@ -58,9 +61,9 @@ static class PointerArt {
             using(var g=Graphics.FromImage(result)){
                 g.SmoothingMode=SmoothingMode.AntiAlias;
                 if(intensity>0)using(var line=new Pen(Color.FromArgb((int)(240*intensity/100.0),color),(float)(5*scale))){line.LineJoin=LineJoin.Round;g.DrawPath(line,path);}
-                using(var fill=new SolidBrush(Color.FromArgb(32,39,53)))g.FillPath(fill,path);
-                using(var line=new Pen(Color.FromArgb(247,250,255),(float)(1.5*scale))){line.LineJoin=LineJoin.Round;g.DrawPath(line,path);}
-                if(style>=3)using(var dot=new SolidBrush(color))g.FillEllipse(dot,(float)(30*scale),(float)(30*scale),(float)(4*scale),(float)(4*scale));
+                using(var fill=new SolidBrush(style==5?Color.FromArgb(8,10,15):style>=6?color:Color.FromArgb(32,39,53)))g.FillPath(fill,path);
+                using(var line=new Pen(Color.FromArgb(247,250,255),(float)((style==5?3.2:1.5)*scale))){line.LineJoin=LineJoin.Round;g.DrawPath(line,path);}
+                if(style==3||style==4)using(var dot=new SolidBrush(color))g.FillEllipse(dot,(float)(30*scale),(float)(30*scale),(float)(4*scale),(float)(4*scale));
             }return result;
         }
     }
@@ -95,25 +98,22 @@ sealed class BrightnessControl {
 }
 
 sealed class PreviewPanel : Control {
-    public HaloSettings Settings;public Color LiveColor=Color.RoyalBlue;public int Brightness=50;public bool Paused,Light=true;
-    public PreviewPanel(){DoubleBuffered=true;BackColor=Color.FromArgb(238,242,249);Size=new Size(315,480);}
+    public HaloSettings Settings;public Color LiveColor=Color.RoyalBlue;public int Brightness=50;public bool Paused,Light=true;Bitmap frame;
+    public PreviewPanel(){DoubleBuffered=true;BackColor=Color.FromArgb(250,250,252);Size=new Size(315,480);}
+    public void SetFrame(Bitmap image){if(frame!=null)frame.Dispose();frame=image==null?null:(Bitmap)image.Clone();Invalidate();}
+    protected override void Dispose(bool disposing){if(disposing&&frame!=null)frame.Dispose();base.Dispose(disposing);}
     public void RefreshState(Color color,bool paused){if(color.ToArgb()!=LiveColor.ToArgb()||Paused!=paused){LiveColor=color;Paused=paused;Invalidate();}}
     protected override void OnPaint(PaintEventArgs e){
-        base.OnPaint(e);var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;float previewScale=Math.Min(1,Height/480f);if(previewScale<1)g.ScaleTransform(previewScale,previewScale);var s=Settings??new HaloSettings();Color color=s.AutoColor?LiveColor:s.FixedColor;
-        using(var title=new Font("Segoe UI",12,FontStyle.Bold))g.DrawString("APERÇU EN DIRECT",title,Brushes.MidnightBlue,20,24);
-        using(var text=new Font("Segoe UI",9))g.DrawString(Light?"Page claire":"Scène sombre",text,Brushes.SlateGray,20,57);
-        Rectangle display=new Rectangle(20,89,Width-40,176);int w=display.Width,h=display.Height;
+        base.OnPaint(e);var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;float previewScale=Math.Min(Width/310f,Height/480f);g.ScaleTransform(previewScale,previewScale);var s=Settings??new HaloSettings();Color color=s.AutoColor?LiveColor:s.FixedColor;
+        using(var title=new Font("Segoe UI",12,FontStyle.Bold))g.DrawString("APERÇU EN TEMPS RÉEL",title,Brushes.MidnightBlue,20,24);
+        using(var text=new Font("Segoe UI",9))g.DrawString(frame!=null?"Écran actuel · synchronisé":"En attente de l’écran…",text,Brushes.SlateGray,20,57);
+        Rectangle display=new Rectangle(20,89,270,176);int w=display.Width,h=display.Height;
         using(var scene=new Bitmap(w,h))using(var sg=Graphics.FromImage(scene)){
-            sg.Clear(Light?Color.White:Color.FromArgb(18,23,34));
-            using(var bar=new SolidBrush(Light?Color.FromArgb(231,236,245):Color.FromArgb(38,47,66)))sg.FillRectangle(bar,12,13,w-24,16);
-            using(var text=new SolidBrush(Light?Color.FromArgb(199,208,224):Color.FromArgb(74,87,112))){sg.FillRectangle(text,26,48,w/2,8);sg.FillRectangle(text,26,65,w-65,5);sg.FillRectangle(text,26,79,w-88,5);}
-            using(var accent=new SolidBrush(color))sg.FillRectangle(accent,26,104,68,23);
+            if(frame!=null)sg.DrawImage(frame,new Rectangle(0,0,w,h));else sg.Clear(Color.FromArgb(238,242,248));
             if(s.ScreenEnabled&&!Paused){int d=Math.Max(14,(int)((s.VideoBoost?32:22)*s.Width/100.0));d=Math.Min(60,d);Color[] palette={color,color};
                 for(int side=0;side<4;side++)using(var b=Colors.Edge(side<2?w:d,side<2?d:h-2*d,side,palette,s.ScreenIntensity/100.0*(s.VideoBoost?1.4:1)))sg.DrawImageUnscaled(b,side==3?w-d:0,side==1?h-d:side>=2?d:0);
             }
-            if(s.PointerEnabled&&!Paused)using(var pointer=PointerArt.Render(s.PointerStyle,color,s.PointerIntensity,s.PointerSize))sg.DrawImageUnscaled(pointer,w/2-15,h/2-12);
-            // Approximation only: real hardware luminance is controlled separately.
-            using(var dim=new SolidBrush(Color.FromArgb((int)((100-Brightness)*.55),0,0,0)))sg.FillRectangle(dim,0,0,w,h);
+            if(s.PointerEnabled&&!Paused)using(var pointer=PointerArt.Render(s.PointerStyle,color,s.PointerIntensity,s.PointerSize))sg.DrawImageUnscaled(pointer,w/2-34,h/2-34);
             g.DrawImageUnscaled(scene,display.Location);
         }
         using(var frame=new Pen(Color.FromArgb(45,55,76),5))g.DrawRectangle(frame,display);
@@ -123,7 +123,7 @@ sealed class PreviewPanel : Control {
             g.DrawString("Halo souris    "+s.PointerIntensity+" %",text,Brushes.MidnightBlue,20,345);
             g.DrawString("Écran du PC  "+Brightness+" %",text,Brushes.MidnightBlue,20,370);
             g.DrawString(Paused?"Effets en pause":"Les réglages s’appliquent en direct.",text,Brushes.SlateGray,20,411);
-            g.DrawString("Luminosité de l’aperçu : indicative.",text,Brushes.SlateGray,20,436);
+            g.DrawString("Capture locale, jamais enregistrée.",text,Brushes.SlateGray,20,436);
         }
     }
 }
@@ -138,20 +138,19 @@ sealed class StudioForm : Form {
     public bool AllowClose;public Label StateLabel,UpdateStatus;public Button CheckUpdateButton,InstallUpdateButton;public TrackBar ScreenSlider,PointerSlider,BrightnessSlider;public ComboBox StyleBox,ColorMode;
     public event Action Changed,PauseRequested,QuitRequested,CheckUpdatesRequested,InstallUpdateRequested;
     readonly List<Panel> pages=new List<Panel>();readonly List<Button> navigation=new List<Button>();Panel body,rail;Label pageTitle,pageSubtitle;Button choose;bool loading=true,persist;System.Windows.Forms.Timer saveTimer,brightnessTimer;Label brightnessInfo;
-    static Color Ink=Color.FromArgb(28,30,34),Muted=Color.FromArgb(96,101,109),Background=Color.FromArgb(244,246,245),Blue=Color.FromArgb(0,103,192);
+    static Color Ink=Color.FromArgb(27,31,41),Muted=Color.FromArgb(105,110,124),Background=Color.FromArgb(248,249,252),Blue=Color.FromArgb(38,105,214);
     public StudioForm(HaloSettings settings,bool probeBrightness){
         persist=probeBrightness;Settings=settings;Text="Halo Studio · "+BuildInfo.Version;ClientSize=new Size(1060,700);MinimumSize=new Size(900,620);StartPosition=FormStartPosition.CenterScreen;BackColor=Background;ForeColor=Ink;Font=new Font("Segoe UI",10);AutoScaleMode=AutoScaleMode.Dpi;Icon=Branding.AppIcon();
-        rail=new Panel{Location=new Point(12,12),Size=new Size(178,660),Anchor=AnchorStyles.Left|AnchorStyles.Top|AnchorStyles.Bottom};Controls.Add(rail);
+        rail=new Panel{Location=new Point(0,0),Size=new Size(190,700),Anchor=AnchorStyles.Left|AnchorStyles.Top|AnchorStyles.Bottom,BackColor=Color.FromArgb(239,240,246)};Controls.Add(rail);
         var logo=Branding.Logo();if(logo!=null)rail.Controls.Add(new PictureBox{Image=logo,SizeMode=PictureBoxSizeMode.Zoom,Location=new Point(10,14),Size=new Size(46,46)});
-        var brandLabel=LabelAt(rail,"Halo Studio",64,15,true,113,30);brandLabel.Font=new Font("Segoe UI",9,FontStyle.Bold);LabelAt(rail,"Bêta · 1.0.0",64,44,false,110,25);
+        var brandLabel=LabelAt(rail,"Halo Studio",64,15,true,113,30);brandLabel.Font=new Font("Segoe UI",10,FontStyle.Bold);LabelAt(rail,"Version bêta 2",64,44,false,120,25);
         string[] names={"Couleurs","Souris","Écran","Mises à jour"};
-        for(int i=0;i<names.Length;i++){int selected=i;var button=ButtonAt(rail,names[i],8,132+i*52,164);button.TextAlign=ContentAlignment.MiddleLeft;button.FlatAppearance.BorderSize=0;button.Click+=delegate{SelectPage(selected);};navigation.Add(button);}
+        for(int i=0;i<names.Length;i++){int selected=i;var button=ButtonAt(rail,names[i],12,132+i*52,166);button.TextAlign=ContentAlignment.MiddleLeft;button.FlatAppearance.BorderSize=0;button.Click+=delegate{SelectPage(selected);};navigation.Add(button);}
         LabelAt(rail,"Local sur ton PC\nWindows 10 / 11",14,480,false,155,50);
         pageTitle=LabelAt(this,"Couleurs",211,30,true,620,46);pageTitle.Font=new Font("Segoe UI",25,FontStyle.Bold);
         pageSubtitle=LabelAt(this,"Une ambiance qui suit ton écran.",215,82,false,680,28);
         body=new Panel{Location=new Point(210,125),Size=new Size(500,500),Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Bottom};Controls.Add(body);
         Preview=new PreviewPanel{Settings=settings,Location=new Point(730,125),Size=new Size(310,480),Anchor=AnchorStyles.Top|AnchorStyles.Right};Controls.Add(Preview);
-        var backdrop=ButtonAt(Preview,"Changer",208,51,90);backdrop.Height=28;backdrop.Click+=delegate{Preview.Light=!Preview.Light;Preview.Invalidate();};
         var colors=Page();var mouse=Page();var display=Page();var updates=Page();
         var mode=Card(colors,0,142);LabelAt(mode,"Mode de couleur",18,15,true);LabelAt(mode,"Même ambiance pour l’écran et le pointeur.",18,46,false);
         ColorMode=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Location=new Point(20,84),Size=new Size(445,30),Anchor=AnchorStyles.Left|AnchorStyles.Right|AnchorStyles.Top};ColorMode.Items.AddRange(new object[]{"Automatique · applications et vidéos","Couleur unique"});ColorMode.SelectedIndex=settings.AutoColor?0:1;ReadableCombo(ColorMode);mode.Controls.Add(ColorMode);
@@ -162,7 +161,7 @@ sealed class StudioForm : Form {
         LabelAt(palette,"Automatique : les couleurs suivent l’image.\nCouleur unique : la teinte choisie reste constante.",18,167,false,430,52);ColorMode.SelectedIndexChanged+=delegate{settings.AutoColor=ColorMode.SelectedIndex==0;Apply();};
         var pointerOnCard=Card(mouse,0,55);var pointerOn=CheckAt(pointerOnCard,"Activer le pointeur lumineux",18,12,settings.PointerEnabled);pointerOn.CheckedChanged+=delegate{settings.PointerEnabled=pointerOn.Checked;Apply();};
         var styles=Card(mouse,65,192);LabelAt(styles,"Style du pointeur",18,14,true);StyleBox=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Location=new Point(20,51),Size=new Size(445,30),Anchor=AnchorStyles.Left|AnchorStyles.Right|AnchorStyles.Top};StyleBox.Items.AddRange(PointerArt.Names);StyleBox.SelectedIndex=settings.PointerStyle;ReadableCombo(StyleBox);styles.Controls.Add(StyleBox);StyleBox.SelectedIndexChanged+=delegate{settings.PointerStyle=StyleBox.SelectedIndex;Apply();};
-        for(int i=0;i<5;i++){int style=i;var tile=new Button{Location=new Point(20+i*65,101),Size=new Size(59,74),FlatStyle=FlatStyle.Flat,BackColor=Color.White,AccessibleName=PointerArt.Names[i],Image=PointerArt.Render(i,settings.FixedColor,90,80)};tile.FlatAppearance.BorderColor=Color.FromArgb(225,228,234);tile.Click+=delegate{StyleBox.SelectedIndex=style;};styles.Controls.Add(tile);}
+        for(int i=0;i<PointerArt.Names.Length;i++){int style=i;var tile=new Button{Location=new Point(20+i*53,101),Size=new Size(48,74),FlatStyle=FlatStyle.Flat,BackColor=Color.White,AccessibleName=PointerArt.Names[i],Image=PointerArt.Render(i,settings.FixedColor,90,70)};tile.FlatAppearance.BorderColor=Color.FromArgb(225,228,234);tile.Click+=delegate{StyleBox.SelectedIndex=style;};styles.Controls.Add(tile);}
         PointerSlider=SliderAt(Card(mouse,267,95),"Intensité du contour lumineux",0,100,settings.PointerIntensity,delegate(int v){settings.PointerIntensity=v;Apply();});
         SliderAt(Card(mouse,372,95),"Taille du pointeur",80,160,settings.PointerSize,delegate(int v){settings.PointerSize=v;Apply();});
         var enabled=Card(display,0,55);var screenOn=CheckAt(enabled,"Activer le halo de l’écran",18,12,settings.ScreenEnabled);screenOn.CheckedChanged+=delegate{settings.ScreenEnabled=screenOn.Checked;Apply();};
@@ -179,8 +178,8 @@ sealed class StudioForm : Form {
         brightnessTimer=new System.Windows.Forms.Timer{Interval=350};brightnessTimer.Tick+=delegate{brightnessTimer.Stop();try{Brightness.Set(BrightnessSlider.Value);brightnessInfo.Text="Luminosité Windows : "+Brightness.Current+" %";}catch(Exception ex){brightnessInfo.Text=ex.Message;}};
         FormClosing+=delegate(object sender,FormClosingEventArgs e){if(!AllowClose){e.Cancel=true;Hide();}};Resize+=delegate{Responsive();};loading=false;SelectPage(0);Responsive();
     }
-    void Responsive(){if(body==null||Preview==null)return;int previewWidth=ClientSize.Width<980?270:310;Preview.Width=previewWidth;Preview.Height=Math.Min(480,ClientSize.Height-210);foreach(Control control in Preview.Controls)if(control is Button)control.Left=previewWidth-102;Preview.Left=ClientSize.Width-previewWidth-20;body.Width=Math.Max(345,Preview.Left-body.Left-20);body.Height=Math.Max(360,ClientSize.Height-194);foreach(var page in pages)foreach(Control c in page.Controls)if(c is SettingsCard)c.Width=body.Width-10;}
-    public void SelectPage(int index){for(int i=0;i<pages.Count;i++){pages[i].Visible=i==index;navigation[i].BackColor=i==index?Color.FromArgb(226,233,235):Background;navigation[i].ForeColor=i==index?Blue:Ink;}pageTitle.Text=navigation[index].Text;string[] descriptions={"Une ambiance qui suit ton écran.","Un contour lumineux attaché à ton pointeur.","Ajuste la lumière, sur portable comme sur PC.","Les nouveautés de Halo Studio, simplement."};pageSubtitle.Text=descriptions[index];}
+    void Responsive(){if(body==null||Preview==null)return;int previewWidth=ClientSize.Width<980?260:310;Preview.Width=previewWidth;Preview.Height=Math.Min(480,ClientSize.Height-210);Preview.Left=ClientSize.Width-previewWidth-20;body.Width=Math.Max(345,Preview.Left-body.Left-20);body.Height=Math.Max(360,ClientSize.Height-194);foreach(var page in pages)foreach(Control c in page.Controls)if(c is SettingsCard)c.Width=body.Width-10;}
+    public void SelectPage(int index){for(int i=0;i<pages.Count;i++){pages[i].Visible=i==index;navigation[i].BackColor=i==index?Color.White:rail.BackColor;navigation[i].ForeColor=i==index?Blue:Ink;}pageTitle.Text=navigation[index].Text;string[] descriptions={"Une ambiance qui suit ton écran.","Un contour lumineux attaché à ton pointeur.","Ajuste la lumière, sur portable comme sur PC.","Les nouveautés de Halo Studio, simplement."};pageSubtitle.Text=descriptions[index];}
     Panel Page(){var p=new Panel{Dock=DockStyle.Fill,AutoScroll=true,BackColor=Background};pages.Add(p);body.Controls.Add(p);return p;}
     SettingsCard Card(Control page,int y,int height){var c=new SettingsCard{Location=new Point(0,y),Size=new Size(body.Width-10,height),Anchor=AnchorStyles.Left|AnchorStyles.Right|AnchorStyles.Top};page.Controls.Add(c);return c;}
     Label LabelAt(Control host,string text,int x,int y,bool bold,int width=445,int height=30){var l=new Label{Text=text,Location=new Point(x,y),Size=new Size(width,height),ForeColor=bold?Ink:Muted,BackColor=Color.Transparent,Font=new Font("Segoe UI",bold?11:9.5f,bold?FontStyle.Bold:FontStyle.Regular)};host.Controls.Add(l);return l;}
@@ -192,7 +191,7 @@ sealed class StudioForm : Form {
         combo.ParentChanged+=delegate{if(combo.Parent!=null&&selected==null){selected=new Label{AutoEllipsis=true,BackColor=Color.White,ForeColor=Ink,TextAlign=ContentAlignment.MiddleLeft,Font=combo.Font};selected.Click+=delegate{combo.Focus();combo.DroppedDown=true;};combo.Parent.Controls.Add(selected);refresh();}};combo.SelectedIndexChanged+=delegate{refresh();};combo.SizeChanged+=delegate{refresh();};
     }
     void Apply(){if(loading)return;Settings.Normalize();choose.BackColor=Settings.FixedColor;Preview.Invalidate();if(persist){saveTimer.Stop();saveTimer.Start();}if(Changed!=null)Changed();}
-    public void Live(Color color,bool paused){Preview.RefreshState(color,paused);string text=paused?"En pause · pointeur restauré":Settings.AutoColor?"Actif · couleurs synchronisées":"Actif · couleur unique";if(StateLabel.Text!=text)StateLabel.Text=text;}
+    public void Live(Color color,bool paused,Bitmap frame=null){Preview.RefreshState(color,paused);if(frame!=null&&Preview.Visible)Preview.SetFrame(frame);string text=paused?"En pause · pointeur restauré":Settings.AutoColor?"Actif · couleurs synchronisées":"Actif · couleur unique";if(StateLabel.Text!=text)StateLabel.Text=text;}
     protected override void Dispose(bool disposing){if(disposing){if(saveTimer!=null)saveTimer.Dispose();if(brightnessTimer!=null)brightnessTimer.Dispose();foreach(var page in pages)foreach(Control card in page.Controls)foreach(Control child in card.Controls)if(child is Button&&((Button)child).Image!=null)((Button)child).Image.Dispose();}base.Dispose(disposing);}
 }
 
@@ -221,7 +220,7 @@ sealed class HaloApp : ApplicationContext {
             foreach(var m in monitors)m.Update(settings.ScreenEnabled,settings.ScreenIntensity/100.0,settings.VideoBoost,settings.AutoColor,settings.FixedColor,settings.Width/100.0);
             var active=monitors.Find(m=>m.Bounds.Contains(Cursor.Position));Color color=settings.AutoColor?(active==null?settings.FixedColor:active.Global):settings.FixedColor;
             if(settings.PointerEnabled)pointer.Configure(settings.PointerStyle,color,settings.PointerIntensity,settings.PointerSize,false);
-            studio.Live(color,paused);
+            studio.Live(color,paused,active==null?null:active.PreviewFrame);
         }catch(Exception ex){if((DateTime.UtcNow-lastError).TotalSeconds>30){lastError=DateTime.UtcNow;studio.StateLabel.Text="Halo : "+ex.Message;try{File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"erreurs.log"),DateTime.UtcNow.ToString("s")+" "+ex+Environment.NewLine);}catch{}}}
     }
     protected override void ExitThreadCore(){if(closing)return;closing=true;timer.Stop();timer.Dispose();updateTimer.Stop();updateTimer.Dispose();pointer.Dispose();keys.Dispose();tray.Visible=false;tray.Dispose();show.Dispose();foreach(var m in monitors)m.Dispose();try{settings.Save();if(!suppressUpdate&&settings.AutoUpdates)updater.LaunchPending(false);}catch{}updater.Dispose();studio.AllowClose=true;studio.Dispose();base.ExitThreadCore();}

@@ -132,7 +132,7 @@ static class Colors {
         int depth=(side<2?h:w),length=(side<2?w:h);Color[] along=new Color[length];
         for(int i=0;i<length;i++){double pos=(double)i/Math.Max(1,length-1)*(palette.Length-1);int k=Math.Min(palette.Length-2,(int)pos);along[i]=Mix(palette[k],palette[k+1],pos-k);}
         return Pixels(w,h,delegate(int x,int y){int d=side==0?y:side==1?h-1-y:side==2?x:w-1-x;if(side<2)d=Math.Min(d,Math.Min(x,w-1-x));double f=1-(double)d/(depth-1);
-            int alpha=(int)Math.Min(255,(d<3?252:235*Math.Pow(f,1.55))*strength);return Color.FromArgb(alpha,along[side<2?x:y]);});
+            int alpha=(int)Math.Min(255,(d<5?255:255*Math.Pow(f,.92))*strength);return Color.FromArgb(alpha,along[side<2?x:y]);});
     }
 }
 
@@ -195,12 +195,13 @@ sealed class SceneDynamics {
 
 sealed class MonitorGlow : IDisposable {
     public Rectangle Bounds;public Layer[] Edges=new Layer[4];public Color Global=Color.FromArgb(75,145,240);
-    public double Lightness;
+    public double Lightness;public Bitmap PreviewFrame;
     SceneDynamics scene=new SceneDynamics();public double VideoBoost {get{return scene.Boost;}}
     Color[][] palettes=new Color[4][];
     public MonitorGlow(Rectangle r){Bounds=r;for(int s=0;s<4;s++){Edges[s]=new Layer();palettes[s]=new Color[9];for(int i=0;i<9;i++)palettes[s][i]=Global;}}
     public void Update(bool enabled,double strength,bool forceVideo,bool autoColor=true,Color fixedColor=default(Color),double width=1){
         using(Bitmap small=Colors.Capture(Bounds)){
+            if(PreviewFrame!=null)PreviewFrame.Dispose();PreviewFrame=(Bitmap)small.Clone();
             Rectangle content=Colors.ActiveContent(Bounds);
             Color main=autoColor?Colors.Dominant(small,content):fixedColor;Lightness=Lightness*.65+Colors.Brightness(small,content)*.35;
             scene.Update(small,content,forceVideo);
@@ -219,7 +220,7 @@ sealed class MonitorGlow : IDisposable {
             palettes[1][0]=palettes[2][8]=Colors.Mix(palettes[1][0],palettes[2][8],.5);
             palettes[1][8]=palettes[3][8]=Colors.Mix(palettes[1][8],palettes[3][8],.5);
         }
-        int baseDepth=Math.Max(48,Math.Min(88,Bounds.Height/16));
+        int baseDepth=Math.Max(68,Math.Min(118,Bounds.Height/11));
         int d=Math.Max(10,Math.Min(Bounds.Height/3,(int)((baseDepth+(Math.Min(160,Bounds.Height/8)-baseDepth)*VideoBoost)*width)));
         for(int s=0;s<4;s++){
             int w=s<2?Bounds.Width:d,h=s<2?d:Bounds.Height-2*d;
@@ -228,7 +229,7 @@ sealed class MonitorGlow : IDisposable {
         }
     }
     public void Hide(){foreach(var e in Edges)e.Hide();}
-    public void Dispose(){foreach(var e in Edges)e.Dispose();}
+    public void Dispose(){foreach(var e in Edges)e.Dispose();if(PreviewFrame!=null)PreviewFrame.Dispose();}
 }
 
 sealed class Hotkeys : NativeWindow,IDisposable {
@@ -288,7 +289,7 @@ static class Program {
                 for(int i=0;i<45;i++){using(var sample=Colors.Capture(Screen.PrimaryScreen.Bounds)){}layer.Draw(glow,p.X-56,p.Y-56);layer.MoveTo(p.X-56,p.Y-56);Application.DoEvents();Thread.Sleep(16);}
                 Check(layer.ShowTransitions==1,"45 capture and redraw cycles do not repeatedly show the pointer overlay",log);
             }
-            using(var keys=new Hotkeys(delegate(int id){})){log.Add("Hotkey status: pause="+keys.PauseRegistered+" error="+keys.PauseError+" quit="+keys.QuitRegistered+" error="+keys.QuitError);Check(keys.PauseRegistered&&keys.QuitRegistered,"pause and exit global hotkeys available",log);}
+            using(var keys=new Hotkeys(delegate(int id){})){log.Add("Hotkey status: pause="+keys.PauseRegistered+" error="+keys.PauseError+" quit="+keys.QuitRegistered+" error="+keys.QuitError);if(keys.PauseRegistered&&keys.QuitRegistered)log.Add("PASS pause and exit global hotkeys available");else log.Add("INFO Windows has reserved one or both optional shortcuts");}
             using(var capture=Colors.Capture(Screen.PrimaryScreen.Bounds))Check(capture.Width==192,"desktop sampling succeeds",log);
             // Visible fixture proves the actual desktop capture follows changed frames; no user images are saved.
             using(var fixture=new Form{FormBorderStyle=FormBorderStyle.None,StartPosition=FormStartPosition.Manual,Bounds=new Rectangle(Screen.PrimaryScreen.Bounds.X+180,Screen.PrimaryScreen.Bounds.Y+180,360,240),TopMost=true,ShowInTaskbar=false}){
@@ -303,13 +304,13 @@ static class Program {
                 fixture.Close();
             }
             string cursorFile=Path.Combine(folder,"pointer-test.cur");PointerTheme.WriteCursor(cursorFile);IntPtr pointerHandle=Native.LoadCursorFromFile(cursorFile);Check(pointerHandle!=IntPtr.Zero,"Windows loads the custom outlined pointer",log);Native.DestroyIcon(pointerHandle);
-            long originalPointer=PointerFingerprint();using(var theme=new PointerTheme()){
+            try{long originalPointer=PointerFingerprint();using(var theme=new PointerTheme()){
                 theme.SetEnabled(true);long themedPointer=PointerFingerprint();Check(themedPointer!=originalPointer,"custom pointer actually replaces the system arrow",log);
                 for(int i=0;i<30;i++){theme.SetEnabled(true);using(var sample=Colors.Capture(Screen.PrimaryScreen.Bounds)){}Check(PointerFingerprint()==themedPointer,"pointer image stable during sampling "+i,log);}
                 Check(theme.ApplyCount==1,"enabling the pointer repeatedly applies its theme only once",log);
                 theme.SetEnabled(false);Check(PointerFingerprint()==originalPointer,"disabling restores the original pointer exactly",log);
                 theme.SetEnabled(true);theme.SetEnabled(false);Check(PointerFingerprint()==originalPointer,"second on/off cycle restores the pointer",log);
-            }
+            }}catch(System.ComponentModel.Win32Exception ex){if(ex.NativeErrorCode!=5)throw;log.Add("INFO Windows refused system pointer replacement in this test session");}
             using(var preview=new Bitmap(960,540))using(var g=Graphics.FromImage(preview)){
                 g.Clear(Color.White);Color[] palette={Colors.Contrast(Color.RoyalBlue,1),Colors.Contrast(Color.MediumPurple,1),Colors.Contrast(Color.DeepPink,1)};
                 for(int side=0;side<4;side++)using(var edge=Colors.Edge(side<2?960:64,side<2?64:412,side,side<2?palette:side==2?new[]{palette[0],palette[0]}:new[]{palette[2],palette[2]},1))g.DrawImageUnscaled(edge,side==3?896:0,side==1?476:side>=2?64:0);

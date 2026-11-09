@@ -22,7 +22,7 @@ static class StudioTests {
         Check(AppUpdater.Parse(safe.Replace("\"draft\":false","\"draft\":true"))==null,"updater ignores draft releases",log);
         string integrity=Path.Combine(folder,"integrity-test.txt");File.WriteAllText(integrity,"valid");string expectedDigest=AppUpdater.Hash(integrity);Check(AppUpdater.Verified(integrity,expectedDigest),"updater accepts matching content",log);File.WriteAllText(integrity,"changed");Check(!AppUpdater.Verified(integrity,expectedDigest),"updater rejects tampered content",log);
         HashSet<long> shapes=new HashSet<long>();
-        using(var sheet=new Bitmap(700,190))using(var g=Graphics.FromImage(sheet)){
+        using(var sheet=new Bitmap(PointerArt.Names.Length*140,190))using(var g=Graphics.FromImage(sheet)){
             g.Clear(Color.FromArgb(245,247,253));
             for(int style=0;style<PointerArt.Names.Length;style++){
                 using(var pointer=PointerArt.Render(style,Color.RoyalBlue,100,150)){
@@ -33,7 +33,7 @@ static class StudioTests {
                 IntPtr h=PointerArt.CreateCursor(style,Color.Magenta,85,140);IconInfo info;
                 try{Check(GetIconInfo(h,out info),"native pointer "+style+" is valid",log);Point expected=PointerArt.Hotspot(style,140);Check(info.X==expected.X&&info.Y==expected.Y,"pointer "+style+" keeps its exact click point",log);Native.DeleteObject(info.Mask);Native.DeleteObject(info.Color);}finally{Native.DestroyIcon(h);}
             }
-            Check(shapes.Count==5,"five visually distinct pointer styles",log);sheet.Save(Path.Combine(folder,"styles-pointeur.png"));
+            Check(shapes.Count==PointerArt.Names.Length,"all pointer styles are visually distinct",log);sheet.Save(Path.Combine(folder,"styles-pointeur.png"));
         }
         using(var off=PointerArt.Render(0,Color.Red,0,100))using(var on=PointerArt.Render(0,Color.Red,100,100)){
             int extra=0;for(int y=0;y<off.Height;y++)for(int x=0;x<off.Width;x++)if(off.GetPixel(x,y).A==0&&on.GetPixel(x,y).A>15)extra++;
@@ -48,6 +48,11 @@ static class StudioTests {
             Check(settings.AutoColor&&settings.PointerStyle==4&&settings.ScreenIntensity==20&&settings.PointerIntensity==90&&changes>=4,"UI controls apply color, style and independent intensity",log);
             using(var low=Snapshot(studio.Preview)){studio.ScreenSlider.Value=100;Application.DoEvents();using(var high=Snapshot(studio.Preview))Check(Hash(low)!=Hash(high),"miniature preview reacts to screen halo intensity",log);}
             using(var low=Snapshot(studio.Preview)){studio.PointerSlider.Value=0;Application.DoEvents();using(var high=Snapshot(studio.Preview))Check(Hash(low)!=Hash(high),"miniature preview reacts to pointer intensity",log);}
+            using(var red=new Bitmap(192,108))using(var blue=new Bitmap(192,108))using(var rg=Graphics.FromImage(red))using(var bg=Graphics.FromImage(blue)){
+                rg.Clear(Color.Red);bg.Clear(Color.Blue);studio.Preview.SetFrame(red);
+                using(var first=Snapshot(studio.Preview)){studio.Preview.SetFrame(blue);using(var second=Snapshot(studio.Preview))Check(Hash(first)!=Hash(second),"live preview changes with captured screen frames",log);}
+                studio.Preview.SetFrame(null);
+            }
             studio.BrightnessSlider.Value=80;Check(studio.Preview.Brightness==80,"miniature preview reacts to PC brightness",log);
             studio.PointerSlider.Value=85;studio.StyleBox.SelectedIndex=0;studio.ColorMode.SelectedIndex=1;
             for(int i=0;i<4;i++){studio.SelectPage(i);Application.DoEvents();using(var shot=Snapshot(studio))shot.Save(Path.Combine(folder,"studio-tab-"+i+".png"));}
