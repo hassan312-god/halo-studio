@@ -1,6 +1,6 @@
-HALO STUDIO — 1.0.0-beta.3
+HALO STUDIO — 1.0.0-beta.4
 
-Installation : ouvrir HaloStudio-Setup-1.0.0-beta.3.exe.
+Installation : ouvrir HaloStudio-Setup-1.0.0-beta.4.exe.
 Ensuite, lancer Halo Studio depuis le menu Démarrer ou le raccourci bureau.
 Compatible Windows 10 (2004+) / Windows 11 et .NET Framework 4.8.
 Installation pour le compte courant, sans droits administrateur.
@@ -18,7 +18,8 @@ Les curseurs de texte et de lien adoptent eux aussi le thème choisi.
 ÉCRAN
 Intensité du halo et étendue réglables, contraste renforcé sur les pages claires.
 Amplification vidéo automatique, ou maintenue via la case dédiée.
-Le mode vidéo uniquement masque le halo hors des scènes animées colorées.
+Le halo vidéo est actif par défaut, sans activer le halo permanent.
+La détection repose sur les scènes animées colorées à l’écran.
 Les couleurs passent progressivement d’une teinte à l’autre, avec un reflet glissant.
 Luminosité réelle du PC : disponible lorsque le pilote de l’écran le permet.
 Sur certains écrans externes, utiliser les boutons physiques de l’écran.

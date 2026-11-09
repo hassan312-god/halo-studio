@@ -11,7 +11,7 @@ using System.Threading;
 using System.Runtime.InteropServices;
 
 public sealed class HaloSettings {
-    public bool AutoColor=true,ScreenEnabled=true,PointerEnabled=true,VideoBoost=false,VideoOnly=false,AutoUpdates=true;
+    public bool AutoColor=true,ScreenEnabled=false,PointerEnabled=true,VideoBoost=false,VideoOnly=true,VideoModeConfigured=false,AutoUpdates=true;
     public int ColorArgb=Color.FromArgb(75,95,245).ToArgb(),ScreenIntensity=100,PointerIntensity=85,PointerStyle=0,PointerSize=100,Width=100;
     public Color FixedColor {get{return Color.FromArgb(ColorArgb);}}
     public static string DataDirectory {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"HaloStudio");}}
@@ -19,10 +19,10 @@ public sealed class HaloSettings {
     public void Normalize(){ScreenIntensity=Clamp(ScreenIntensity,0,100);PointerIntensity=Clamp(PointerIntensity,0,100);PointerStyle=Clamp(PointerStyle,0,7);PointerSize=Clamp(PointerSize,80,160);Width=Clamp(Width,50,180);ColorArgb=Color.FromArgb(255,FixedColor.R,FixedColor.G,FixedColor.B).ToArgb();}
     static int Clamp(int x,int min,int max){return Math.Max(min,Math.Min(max,x));}
     public static HaloSettings Load(){
-        try{using(var stream=File.OpenRead(FileName)){var s=(HaloSettings)new XmlSerializer(typeof(HaloSettings)).Deserialize(stream);s.Normalize();return s;}}catch{}
+        try{using(var stream=File.OpenRead(FileName)){var s=(HaloSettings)new XmlSerializer(typeof(HaloSettings)).Deserialize(stream);if(!s.VideoModeConfigured){s.ScreenEnabled=false;s.VideoOnly=true;s.VideoModeConfigured=true;}s.Normalize();return s;}}catch{}
         var fallback=new HaloSettings();
         try{var p=File.ReadAllLines(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"preferences.txt"));fallback.ScreenEnabled=bool.Parse(p[0]);fallback.PointerEnabled=bool.Parse(p[1]);fallback.ScreenIntensity=(int)(double.Parse(p[2],System.Globalization.CultureInfo.InvariantCulture)*100);fallback.VideoBoost=p.Length>4&&bool.Parse(p[4]);}catch{}
-        return fallback;
+        fallback.ScreenEnabled=false;fallback.VideoOnly=true;fallback.VideoModeConfigured=true;return fallback;
     }
     public void Save(){Normalize();Directory.CreateDirectory(DataDirectory);string temp=FileName+".tmp";using(var stream=File.Create(temp))new XmlSerializer(typeof(HaloSettings)).Serialize(stream,this);if(File.Exists(FileName))File.Replace(temp,FileName,null);else File.Move(temp,FileName);}
 }
@@ -112,7 +112,7 @@ sealed class PreviewPanel : Control {
         Rectangle display=new Rectangle(20,89,270,176);int w=display.Width,h=display.Height;
         using(var scene=new Bitmap(w,h))using(var sg=Graphics.FromImage(scene)){
             if(frame!=null)sg.DrawImage(frame,new Rectangle(0,0,w,h));else sg.Clear(Color.FromArgb(238,242,248));
-            if(s.ScreenEnabled&&!Paused&&(!s.VideoOnly||VideoDetected)){int d=Math.Max(14,(int)((s.VideoBoost?32:22)*s.Width/100.0));d=Math.Min(60,d);Color[] palette={color,color};
+            if(!Paused&&(s.ScreenEnabled||(s.VideoOnly&&VideoDetected))){int d=Math.Max(14,(int)((s.VideoBoost?32:22)*s.Width/100.0));d=Math.Min(60,d);Color[] palette={color,color};
                 for(int side=0;side<4;side++)using(var b=Colors.Edge(side<2?w:d,side<2?d:h-2*d,side,palette,s.ScreenIntensity/100.0*(s.VideoBoost?1.4:1)))sg.DrawImageUnscaled(b,side==3?w-d:0,side==1?h-d:side>=2?d:0);
             }
             if(s.PointerEnabled&&!Paused)using(var pointer=PointerArt.Render(s.PointerStyle,color,s.PointerIntensity,s.PointerSize))sg.DrawImageUnscaled(pointer,w/2-34,h/2-34);
@@ -147,7 +147,7 @@ sealed class StudioForm : Form {
         persist=probeBrightness;Settings=settings;Text="Halo Studio · "+BuildInfo.Version;ClientSize=new Size(1060,700);MinimumSize=new Size(900,620);StartPosition=FormStartPosition.CenterScreen;BackColor=Background;ForeColor=Ink;Font=new Font("Segoe UI",10);AutoScaleMode=AutoScaleMode.Dpi;Icon=Branding.AppIcon();
         rail=new Panel{Location=new Point(0,0),Size=new Size(190,700),Anchor=AnchorStyles.Left|AnchorStyles.Top|AnchorStyles.Bottom,BackColor=Color.FromArgb(239,240,246)};Controls.Add(rail);
         var logo=Branding.Logo();if(logo!=null)rail.Controls.Add(new PictureBox{Image=logo,SizeMode=PictureBoxSizeMode.Zoom,Location=new Point(10,14),Size=new Size(46,46)});
-        var brandLabel=LabelAt(rail,"Halo Studio",64,15,true,113,30);brandLabel.Font=new Font("Segoe UI",10,FontStyle.Bold);LabelAt(rail,"Version bêta 3",64,44,false,120,25);
+        var brandLabel=LabelAt(rail,"Halo Studio",64,15,true,113,30);brandLabel.Font=new Font("Segoe UI",10,FontStyle.Bold);LabelAt(rail,"Version bêta 4",64,44,false,120,25);
         string[] names={"Couleurs","Souris","Écran","Mises à jour"};
         for(int i=0;i<names.Length;i++){int selected=i;var button=ButtonAt(rail,names[i],12,132+i*52,166);button.TextAlign=ContentAlignment.MiddleLeft;button.FlatAppearance.BorderSize=0;using(var pill=new GraphicsPath()){pill.AddArc(0,0,24,24,180,90);pill.AddArc(button.Width-25,0,24,24,270,90);pill.AddArc(button.Width-25,button.Height-25,24,24,0,90);pill.AddArc(0,button.Height-25,24,24,90,90);pill.CloseFigure();button.Region=new Region(pill);}button.Click+=delegate{SelectPage(selected);};navigation.Add(button);}
         LabelAt(rail,"Local sur ton PC\nWindows 10 / 11",14,480,false,155,50);
@@ -168,12 +168,12 @@ sealed class StudioForm : Form {
         for(int i=0;i<PointerArt.Names.Length;i++){int style=i;var tile=new Button{Location=new Point(20+i*53,101),Size=new Size(48,74),FlatStyle=FlatStyle.Flat,BackColor=Color.White,AccessibleName=PointerArt.Names[i],Image=PointerArt.Render(i,settings.FixedColor,90,70)};tile.FlatAppearance.BorderColor=Color.FromArgb(225,228,234);tile.Click+=delegate{StyleBox.SelectedIndex=style;};styles.Controls.Add(tile);}
         PointerSlider=SliderAt(Card(mouse,267,95),"Intensité du contour lumineux",0,100,settings.PointerIntensity,delegate(int v){settings.PointerIntensity=v;Apply();});
         SliderAt(Card(mouse,372,95),"Taille du pointeur",80,160,settings.PointerSize,delegate(int v){settings.PointerSize=v;Apply();});
-        var enabled=Card(display,0,55);var screenOn=CheckAt(enabled,"Activer le halo de l’écran",18,12,settings.ScreenEnabled);screenOn.CheckedChanged+=delegate{settings.ScreenEnabled=screenOn.Checked;Apply();};
+        var enabled=Card(display,0,55);var screenOn=CheckAt(enabled,"Halo permanent, même hors vidéo",18,12,settings.ScreenEnabled);screenOn.CheckedChanged+=delegate{settings.ScreenEnabled=screenOn.Checked;Apply();};
         ScreenSlider=SliderAt(Card(display,65,95),"Intensité du halo",0,100,settings.ScreenIntensity,delegate(int v){settings.ScreenIntensity=v;Apply();});
         SliderAt(Card(display,170,95),"Étendue du halo",50,180,settings.Width,delegate(int v){settings.Width=v;Apply();});
         var vid=Card(display,275,55);var video=CheckAt(vid,"Vidéo : amplification maximale",18,12,settings.VideoBoost);video.CheckedChanged+=delegate{settings.VideoBoost=video.Checked;Apply();};
         Brightness=probeBrightness?new BrightnessControl():null;int current=Brightness!=null&&Brightness.Available?Brightness.Current:50;Preview.Brightness=current;
-        var videoOnlyCard=Card(display,340,55);var videoOnly=CheckAt(videoOnlyCard,"Activer le halo seulement pendant une vidéo",18,12,settings.VideoOnly);videoOnly.CheckedChanged+=delegate{settings.VideoOnly=videoOnly.Checked;Apply();};
+        var videoOnlyCard=Card(display,340,55);var videoOnly=CheckAt(videoOnlyCard,"Halo automatique pendant les vidéos",18,12,settings.VideoOnly);videoOnly.CheckedChanged+=delegate{settings.VideoOnly=videoOnly.Checked;Apply();};
         var pc=Card(display,405,135);BrightnessSlider=SliderAt(pc,"Luminosité du PC",0,100,current,delegate(int v){Preview.Brightness=v;Preview.Invalidate();if(!loading&&Brightness!=null&&Brightness.Available){brightnessTimer.Stop();brightnessTimer.Start();}});BrightnessSlider.Enabled=Brightness!=null&&Brightness.Available;brightnessInfo=LabelAt(pc,BrightnessSlider.Enabled?"Luminosité matérielle · Windows":"Écran non compatible : utiliser ses boutons physiques.",18,94,false,445,37);
         var version=Card(updates,0,135);LabelAt(version,"Halo Studio · canal bêta",18,17,true);LabelAt(version,"Version installée : "+BuildInfo.Version,18,55,false);LabelAt(version,"Les nouveautés arrivent d’abord en version bêta.",18,89,false);
         var autoCard=Card(updates,145,93);var automatic=CheckAt(autoCard,"Mises à jour automatiques",18,12,settings.AutoUpdates);automatic.CheckedChanged+=delegate{settings.AutoUpdates=automatic.Checked;Apply();};LabelAt(autoCard,"Téléchargées puis installées à la fermeture.",18,51,false);
@@ -222,7 +222,7 @@ sealed class HaloApp : ApplicationContext {
         if(stop.WaitOne(0)){suppressUpdate=true;ExitThread();return;}if(show.WaitOne(0)){studio.Show();Native.ShowWindow(studio.Handle,5);studio.Activate();}RefreshUpdates();if(paused)return;
         try{
             string now="";foreach(var s in Screen.AllScreens)now+=s.Bounds.ToString();if(now!=topology){foreach(var m in monitors)m.Dispose();monitors.Clear();foreach(var s in Screen.AllScreens)monitors.Add(new MonitorGlow(s.Bounds));topology=now;}
-            foreach(var m in monitors)m.Update(settings.ScreenEnabled,settings.ScreenIntensity/100.0,settings.VideoBoost,settings.AutoColor,settings.FixedColor,settings.Width/100.0,settings.VideoOnly);
+            foreach(var m in monitors)m.Update(settings.ScreenEnabled||settings.VideoOnly,settings.ScreenIntensity/100.0,settings.VideoBoost,settings.AutoColor,settings.FixedColor,settings.Width/100.0,settings.VideoOnly&&!settings.ScreenEnabled);
             var active=monitors.Find(m=>m.Bounds.Contains(Cursor.Position));Color color=settings.AutoColor?(active==null?settings.FixedColor:active.Global):settings.FixedColor;
             if(settings.PointerEnabled)pointer.Configure(settings.PointerStyle,color,settings.PointerIntensity,settings.PointerSize,false);
             studio.Live(color,paused,active==null?null:active.PreviewFrame,active!=null&&active.VideoBoost>=.18);

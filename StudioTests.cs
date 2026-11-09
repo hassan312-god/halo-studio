@@ -13,6 +13,7 @@ static class StudioTests {
     [StructLayout(LayoutKind.Sequential)] struct IconInfo {[MarshalAs(UnmanagedType.Bool)]public bool Icon;public uint X,Y;public IntPtr Mask,Color;}
     [DllImport("user32.dll")] static extern bool GetIconInfo(IntPtr cursor,out IconInfo info);
     public static void Run(string folder,List<string> log){
+        var defaults=new HaloSettings();Check(defaults.VideoOnly&&!defaults.ScreenEnabled,"video halo is enabled by default without permanent screen glow",log);
         Check(AppUpdater.Compare("1.0.0-beta.2","1.0.0-beta.1")>0&&AppUpdater.Compare("1.0.0","1.0.0-beta.9")>0&&AppUpdater.Compare("0.9.9","1.0.0-beta.1")<0,"updater orders beta, stable and older versions correctly",log);
         string digest=new string('a',64);
         string safe="[{\"draft\":false,\"tag_name\":\"v1.0.0-beta.2\",\"assets\":[{\"name\":\"HaloStudio-Setup-1.0.0-beta.2.exe\",\"browser_download_url\":\""+BuildInfo.RepositoryUrl+"/releases/download/v1.0.0-beta.2/HaloStudio-Setup-1.0.0-beta.2.exe\",\"size\":1234,\"digest\":\"sha256:"+digest+"\"}]}]";
@@ -40,7 +41,7 @@ static class StudioTests {
             int extra=0;for(int y=0;y<off.Height;y++)for(int x=0;x<off.Width;x++)if(off.GetPixel(x,y).A==0&&on.GetPixel(x,y).A>15)extra++;
             Check(extra>100,"pointer intensity adds light along the silhouette",log);Check(Hash(off)!=Hash(on),"zero and full pointer intensity differ",log);
         }
-        var settings=new HaloSettings{AutoColor=false,ColorArgb=Color.HotPink.ToArgb(),PointerStyle=3,PointerIntensity=31,ScreenIntensity=72,PointerSize=140,Width=130};
+        var settings=new HaloSettings{AutoColor=false,ColorArgb=Color.HotPink.ToArgb(),PointerStyle=3,PointerIntensity=31,ScreenIntensity=72,PointerSize=140,Width=130,ScreenEnabled=true};
         var serializer=new XmlSerializer(typeof(HaloSettings));using(var memory=new MemoryStream()){serializer.Serialize(memory,settings);memory.Position=0;var loaded=(HaloSettings)serializer.Deserialize(memory);Check(loaded.ColorArgb==settings.ColorArgb&&loaded.PointerStyle==3&&loaded.PointerIntensity==31&&loaded.ScreenIntensity==72&&loaded.Width==130,"all customization settings survive serialization",log);}
         using(var monitor=new MonitorGlow(Screen.PrimaryScreen.Bounds)){monitor.Update(false,1,false,false,Color.HotPink,1);Check(monitor.Global.ToArgb()==Color.HotPink.ToArgb(),"single-color mode keeps the exact chosen color",log);}
         using(var studio=new StudioForm(settings,false)){
