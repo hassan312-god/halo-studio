@@ -35,6 +35,7 @@ static class StudioTests {
             }
             Check(shapes.Count==PointerArt.Names.Length,"all pointer styles are visually distinct",log);sheet.Save(Path.Combine(folder,"styles-pointeur.png"));
         }
+        for(int role=1;role<=2;role++){IntPtr h=PointerArt.CreateCursor(5,Color.DodgerBlue,90,100,role);IconInfo info;try{Check(GetIconInfo(h,out info),"hand or text cursor is a valid native pointer",log);Check(info.X==32&&info.Y==31,"hand and text cursor retain their click point",log);Native.DeleteObject(info.Mask);Native.DeleteObject(info.Color);}finally{Native.DestroyIcon(h);}}
         using(var off=PointerArt.Render(0,Color.Red,0,100))using(var on=PointerArt.Render(0,Color.Red,100,100)){
             int extra=0;for(int y=0;y<off.Height;y++)for(int x=0;x<off.Width;x++)if(off.GetPixel(x,y).A==0&&on.GetPixel(x,y).A>15)extra++;
             Check(extra>100,"pointer intensity adds light along the silhouette",log);Check(Hash(off)!=Hash(on),"zero and full pointer intensity differ",log);

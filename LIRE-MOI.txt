@@ -12,20 +12,21 @@ Couleur unique : choisir une teinte avec la palette ou le sélecteur.
 SOURIS
 Huit styles, taille et intensité du contour lumineux réglables.
 La lueur est intégrée au curseur Windows : elle suit exactement sa forme.
-Les curseurs de texte, de lien et de redimensionnement restent ceux de Windows.
-À la pause ou à la fermeture, le pointeur d’origine est restauré.
+Les curseurs de texte et de lien adoptent eux aussi le thème choisi.
+À la pause ou à la fermeture, les pointeurs d’origine sont restaurés.
 
 ÉCRAN
 Intensité du halo et étendue réglables, contraste renforcé sur les pages claires.
 Amplification vidéo automatique, ou maintenue via la case dédiée.
+Le mode vidéo uniquement masque le halo hors des scènes animées colorées.
+Les couleurs passent progressivement d’une teinte à l’autre, avec un reflet glissant.
 Luminosité réelle du PC : disponible lorsque le pilote de l’écran le permet.
 Sur certains écrans externes, utiliser les boutons physiques de l’écran.
 La fenêtre s’adapte aux portables et PC ; un halo est dessiné sur chaque écran.
 
 APERÇU
-Le petit écran à droite montre les couleurs, les styles et les intensités.
-Le bouton Changer alterne fond clair et sombre.
-L’aperçu de luminosité physique est indicatif, car il dépend du matériel.
+Le petit écran à droite montre en direct la capture locale de l’écran actif.
+Cette capture n’est pas enregistrée. Les réglages agissent sans attendre.
 
 MISES À JOUR
 Canal bêta, depuis https://github.com/hassan312-god/halo-studio/releases

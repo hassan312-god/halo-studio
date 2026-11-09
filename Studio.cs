@@ -11,7 +11,7 @@ using System.Threading;
 using System.Runtime.InteropServices;
 
 public sealed class HaloSettings {
-    public bool AutoColor=true,ScreenEnabled=true,PointerEnabled=true,VideoBoost=false,AutoUpdates=true;
+    public bool AutoColor=true,ScreenEnabled=true,PointerEnabled=true,VideoBoost=false,VideoOnly=false,AutoUpdates=true;
     public int ColorArgb=Color.FromArgb(75,95,245).ToArgb(),ScreenIntensity=100,PointerIntensity=85,PointerStyle=0,PointerSize=100,Width=100;
     public Color FixedColor {get{return Color.FromArgb(ColorArgb);}}
     public static string DataDirectory {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"HaloStudio");}}
@@ -35,8 +35,10 @@ static class Branding {
 static class PointerArt {
     public static readonly string[] Names={"Pointe douce","Flèche classique","Flèche fine","Diamant","Croix précise","Flèche contrastée","Chevron lumineux","Pointe futuriste"};
     public static Point Hotspot(int style,int size){double scale=size/100.0;return style==3||style==4?new Point((int)(32*scale),(int)(32*scale)):new Point((int)(17*scale),(int)(14*scale));}
-    static GraphicsPath Shape(int style){
+    static GraphicsPath Shape(int style,int role=0){
         var p=new GraphicsPath();
+        if(role==1){p.AddPolygon(new[]{new PointF(8,1),new PointF(13,1),new PointF(14,18),new PointF(18,14),new PointF(22,15),new PointF(25,18),new PointF(29,19),new PointF(31,23),new PointF(27,35),new PointF(11,35),new PointF(3,23),new PointF(5,19),new PointF(9,23)});using(var hand=new Matrix()){hand.Translate(17,14);p.Transform(hand);}return p;}
+        if(role==2){p.AddPolygon(new[]{new PointF(3,1),new PointF(27,1),new PointF(27,5),new PointF(18,5),new PointF(18,30),new PointF(27,30),new PointF(27,34),new PointF(3,34),new PointF(3,30),new PointF(12,30),new PointF(12,5),new PointF(3,5)});using(var beam=new Matrix()){beam.Translate(17,14);p.Transform(beam);}return p;}
         if(style==0)p.AddPolygon(new[]{new PointF(0,0),new PointF(25,9),new PointF(15,16),new PointF(9,29)});
         if(style==1)p.AddPolygon(new[]{new PointF(0,0),new PointF(0,29),new PointF(8,23),new PointF(13,34),new PointF(19,31),new PointF(14,21),new PointF(27,21)});
         if(style==2)p.AddPolygon(new[]{new PointF(0,0),new PointF(9,29),new PointF(13,17),new PointF(28,11)});
@@ -47,9 +49,9 @@ static class PointerArt {
         if(style==7)p.AddPolygon(new[]{new PointF(0,0),new PointF(31,17),new PointF(5,33),new PointF(11,18)});
         using(var m=new Matrix()){m.Translate(17,14);p.Transform(m);}return p;
     }
-    public static Bitmap Render(int style,Color color,int intensity,int size){
+    public static Bitmap Render(int style,Color color,int intensity,int size,int role=0){
         int n=(int)(68*size/100.0);double scale=size/100.0;
-        using(var mask=new Bitmap(n,n,PixelFormat.Format32bppArgb))using(var path=Shape(style)){
+        using(var mask=new Bitmap(n,n,PixelFormat.Format32bppArgb))using(var path=Shape(style,role)){
             using(var m=new Matrix()){m.Scale((float)scale,(float)scale);path.Transform(m);}
             using(var g=Graphics.FromImage(mask)){g.SmoothingMode=SmoothingMode.AntiAlias;g.FillPath(Brushes.White,path);}
             // Glow is the blurred silhouette of the actual pointer, never a radial circle.
@@ -63,17 +65,17 @@ static class PointerArt {
                 if(intensity>0)using(var line=new Pen(Color.FromArgb((int)(240*intensity/100.0),color),(float)(5*scale))){line.LineJoin=LineJoin.Round;g.DrawPath(line,path);}
                 using(var fill=new SolidBrush(style==5?Color.FromArgb(8,10,15):style>=6?color:Color.FromArgb(32,39,53)))g.FillPath(fill,path);
                 using(var line=new Pen(Color.FromArgb(247,250,255),(float)((style==5?3.2:1.5)*scale))){line.LineJoin=LineJoin.Round;g.DrawPath(line,path);}
-                if(style==3||style==4)using(var dot=new SolidBrush(color))g.FillEllipse(dot,(float)(30*scale),(float)(30*scale),(float)(4*scale),(float)(4*scale));
+                if(role==0&&(style==3||style==4))using(var dot=new SolidBrush(color))g.FillEllipse(dot,(float)(30*scale),(float)(30*scale),(float)(4*scale),(float)(4*scale));
             }return result;
         }
     }
     [StructLayout(LayoutKind.Sequential)] struct ICONINFO { [MarshalAs(UnmanagedType.Bool)] public bool Icon;public uint X,Y;public IntPtr Mask,Color; }
     [DllImport("user32.dll",SetLastError=true)] static extern IntPtr CreateIconIndirect(ref ICONINFO info);
     [DllImport("gdi32.dll")] static extern IntPtr CreateBitmap(int width,int height,uint planes,uint bits,byte[] bytes);
-    public static IntPtr CreateCursor(int style,Color color,int intensity,int size){
-        using(var b=Render(style,color,intensity,size)){
+    public static IntPtr CreateCursor(int style,Color color,int intensity,int size,int role=0){
+        using(var b=Render(style,color,intensity,size,role)){
             IntPtr pixels=b.GetHbitmap(Color.FromArgb(0));IntPtr mask=CreateBitmap(b.Width,b.Height,1,1,new byte[((b.Width+15)/16)*2*b.Height]);
-            try{Point hot=Hotspot(style,size);var info=new ICONINFO{Icon=false,X=(uint)hot.X,Y=(uint)hot.Y,Mask=mask,Color=pixels};IntPtr cursor=CreateIconIndirect(ref info);if(cursor==IntPtr.Zero)throw new System.ComponentModel.Win32Exception();return cursor;}
+            try{Point hot=role==0?Hotspot(style,size):new Point((int)(32*size/100.0),(int)(31*size/100.0));var info=new ICONINFO{Icon=false,X=(uint)hot.X,Y=(uint)hot.Y,Mask=mask,Color=pixels};IntPtr cursor=CreateIconIndirect(ref info);if(cursor==IntPtr.Zero)throw new System.ComponentModel.Win32Exception();return cursor;}
             finally{Native.DeleteObject(pixels);Native.DeleteObject(mask);}
         }
     }
@@ -98,7 +100,7 @@ sealed class BrightnessControl {
 }
 
 sealed class PreviewPanel : Control {
-    public HaloSettings Settings;public Color LiveColor=Color.RoyalBlue;public int Brightness=50;public bool Paused,Light=true;Bitmap frame;
+    public HaloSettings Settings;public Color LiveColor=Color.RoyalBlue;public int Brightness=50;public bool Paused,Light=true,VideoDetected;Bitmap frame;
     public PreviewPanel(){DoubleBuffered=true;BackColor=Color.FromArgb(250,250,252);Size=new Size(315,480);}
     public void SetFrame(Bitmap image){if(frame!=null)frame.Dispose();frame=image==null?null:(Bitmap)image.Clone();Invalidate();}
     protected override void Dispose(bool disposing){if(disposing&&frame!=null)frame.Dispose();base.Dispose(disposing);}
@@ -110,7 +112,7 @@ sealed class PreviewPanel : Control {
         Rectangle display=new Rectangle(20,89,270,176);int w=display.Width,h=display.Height;
         using(var scene=new Bitmap(w,h))using(var sg=Graphics.FromImage(scene)){
             if(frame!=null)sg.DrawImage(frame,new Rectangle(0,0,w,h));else sg.Clear(Color.FromArgb(238,242,248));
-            if(s.ScreenEnabled&&!Paused){int d=Math.Max(14,(int)((s.VideoBoost?32:22)*s.Width/100.0));d=Math.Min(60,d);Color[] palette={color,color};
+            if(s.ScreenEnabled&&!Paused&&(!s.VideoOnly||VideoDetected)){int d=Math.Max(14,(int)((s.VideoBoost?32:22)*s.Width/100.0));d=Math.Min(60,d);Color[] palette={color,color};
                 for(int side=0;side<4;side++)using(var b=Colors.Edge(side<2?w:d,side<2?d:h-2*d,side,palette,s.ScreenIntensity/100.0*(s.VideoBoost?1.4:1)))sg.DrawImageUnscaled(b,side==3?w-d:0,side==1?h-d:side>=2?d:0);
             }
             if(s.PointerEnabled&&!Paused)using(var pointer=PointerArt.Render(s.PointerStyle,color,s.PointerIntensity,s.PointerSize))sg.DrawImageUnscaled(pointer,w/2-34,h/2-34);
@@ -169,7 +171,8 @@ sealed class StudioForm : Form {
         SliderAt(Card(display,170,95),"Étendue du halo",50,180,settings.Width,delegate(int v){settings.Width=v;Apply();});
         var vid=Card(display,275,55);var video=CheckAt(vid,"Vidéo : amplification maximale",18,12,settings.VideoBoost);video.CheckedChanged+=delegate{settings.VideoBoost=video.Checked;Apply();};
         Brightness=probeBrightness?new BrightnessControl():null;int current=Brightness!=null&&Brightness.Available?Brightness.Current:50;Preview.Brightness=current;
-        var pc=Card(display,340,135);BrightnessSlider=SliderAt(pc,"Luminosité du PC",0,100,current,delegate(int v){Preview.Brightness=v;Preview.Invalidate();if(!loading&&Brightness!=null&&Brightness.Available){brightnessTimer.Stop();brightnessTimer.Start();}});BrightnessSlider.Enabled=Brightness!=null&&Brightness.Available;brightnessInfo=LabelAt(pc,BrightnessSlider.Enabled?"Luminosité matérielle · Windows":"Écran non compatible : utiliser ses boutons physiques.",18,94,false,445,37);
+        var videoOnlyCard=Card(display,340,55);var videoOnly=CheckAt(videoOnlyCard,"Activer le halo seulement pendant une vidéo",18,12,settings.VideoOnly);videoOnly.CheckedChanged+=delegate{settings.VideoOnly=videoOnly.Checked;Apply();};
+        var pc=Card(display,405,135);BrightnessSlider=SliderAt(pc,"Luminosité du PC",0,100,current,delegate(int v){Preview.Brightness=v;Preview.Invalidate();if(!loading&&Brightness!=null&&Brightness.Available){brightnessTimer.Stop();brightnessTimer.Start();}});BrightnessSlider.Enabled=Brightness!=null&&Brightness.Available;brightnessInfo=LabelAt(pc,BrightnessSlider.Enabled?"Luminosité matérielle · Windows":"Écran non compatible : utiliser ses boutons physiques.",18,94,false,445,37);
         var version=Card(updates,0,135);LabelAt(version,"Halo Studio · canal bêta",18,17,true);LabelAt(version,"Version installée : "+BuildInfo.Version,18,55,false);LabelAt(version,"Les nouveautés arrivent d’abord en version bêta.",18,89,false);
         var autoCard=Card(updates,145,93);var automatic=CheckAt(autoCard,"Mises à jour automatiques",18,12,settings.AutoUpdates);automatic.CheckedChanged+=delegate{settings.AutoUpdates=automatic.Checked;Apply();};LabelAt(autoCard,"Téléchargées puis installées à la fermeture.",18,51,false);
         var actions=Card(updates,248,205);UpdateStatus=LabelAt(actions,"Prêt à vérifier les mises à jour.",18,18,false,445,56);CheckUpdateButton=ButtonAt(actions,"Vérifier et télécharger",20,85,280);CheckUpdateButton.Click+=delegate{if(CheckUpdatesRequested!=null)CheckUpdatesRequested();};InstallUpdateButton=ButtonAt(actions,"Installer et relancer",20,139,280);InstallUpdateButton.Enabled=false;InstallUpdateButton.Click+=delegate{if(InstallUpdateRequested!=null)InstallUpdateRequested();};
@@ -191,7 +194,7 @@ sealed class StudioForm : Form {
         combo.ParentChanged+=delegate{if(combo.Parent!=null&&selected==null){selected=new Label{AutoEllipsis=true,BackColor=Color.White,ForeColor=Ink,TextAlign=ContentAlignment.MiddleLeft,Font=combo.Font};selected.Click+=delegate{combo.Focus();combo.DroppedDown=true;};combo.Parent.Controls.Add(selected);refresh();}};combo.SelectedIndexChanged+=delegate{refresh();};combo.SizeChanged+=delegate{refresh();};
     }
     void Apply(){if(loading)return;Settings.Normalize();choose.BackColor=Settings.FixedColor;Preview.Invalidate();if(persist){saveTimer.Stop();saveTimer.Start();}if(Changed!=null)Changed();}
-    public void Live(Color color,bool paused,Bitmap frame=null){Preview.RefreshState(color,paused);if(frame!=null&&Preview.Visible)Preview.SetFrame(frame);string text=paused?"En pause · pointeur restauré":Settings.AutoColor?"Actif · couleurs synchronisées":"Actif · couleur unique";if(StateLabel.Text!=text)StateLabel.Text=text;}
+    public void Live(Color color,bool paused,Bitmap frame=null,bool videoDetected=false){Preview.VideoDetected=videoDetected;Preview.RefreshState(color,paused);if(frame!=null&&Preview.Visible)Preview.SetFrame(frame);string text=paused?"En pause · pointeur restauré":Settings.AutoColor?"Actif · couleurs synchronisées":"Actif · couleur unique";if(StateLabel.Text!=text)StateLabel.Text=text;}
     protected override void Dispose(bool disposing){if(disposing){if(saveTimer!=null)saveTimer.Dispose();if(brightnessTimer!=null)brightnessTimer.Dispose();foreach(var page in pages)foreach(Control card in page.Controls)foreach(Control child in card.Controls)if(child is Button&&((Button)child).Image!=null)((Button)child).Image.Dispose();}base.Dispose(disposing);}
 }
 
@@ -217,10 +220,10 @@ sealed class HaloApp : ApplicationContext {
         if(stop.WaitOne(0)){suppressUpdate=true;ExitThread();return;}if(show.WaitOne(0)){studio.Show();Native.ShowWindow(studio.Handle,5);studio.Activate();}RefreshUpdates();if(paused)return;
         try{
             string now="";foreach(var s in Screen.AllScreens)now+=s.Bounds.ToString();if(now!=topology){foreach(var m in monitors)m.Dispose();monitors.Clear();foreach(var s in Screen.AllScreens)monitors.Add(new MonitorGlow(s.Bounds));topology=now;}
-            foreach(var m in monitors)m.Update(settings.ScreenEnabled,settings.ScreenIntensity/100.0,settings.VideoBoost,settings.AutoColor,settings.FixedColor,settings.Width/100.0);
+            foreach(var m in monitors)m.Update(settings.ScreenEnabled,settings.ScreenIntensity/100.0,settings.VideoBoost,settings.AutoColor,settings.FixedColor,settings.Width/100.0,settings.VideoOnly);
             var active=monitors.Find(m=>m.Bounds.Contains(Cursor.Position));Color color=settings.AutoColor?(active==null?settings.FixedColor:active.Global):settings.FixedColor;
             if(settings.PointerEnabled)pointer.Configure(settings.PointerStyle,color,settings.PointerIntensity,settings.PointerSize,false);
-            studio.Live(color,paused,active==null?null:active.PreviewFrame);
+            studio.Live(color,paused,active==null?null:active.PreviewFrame,active!=null&&active.VideoBoost>=.18);
         }catch(Exception ex){if((DateTime.UtcNow-lastError).TotalSeconds>30){lastError=DateTime.UtcNow;studio.StateLabel.Text="Halo : "+ex.Message;try{File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"erreurs.log"),DateTime.UtcNow.ToString("s")+" "+ex+Environment.NewLine);}catch{}}}
     }
     protected override void ExitThreadCore(){if(closing)return;closing=true;timer.Stop();timer.Dispose();updateTimer.Stop();updateTimer.Dispose();pointer.Dispose();keys.Dispose();tray.Visible=false;tray.Dispose();show.Dispose();foreach(var m in monitors)m.Dispose();try{settings.Save();if(!suppressUpdate&&settings.AutoUpdates)updater.LaunchPending(false);}catch{}updater.Dispose();studio.AllowClose=true;studio.Dispose();base.ExitThreadCore();}

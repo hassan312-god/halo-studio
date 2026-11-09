@@ -128,23 +128,25 @@ static class Colors {
             Color c=pixel(x,y);int i=y*data.Stride+x*4;bytes[i]=(byte)(c.B*c.A/255);bytes[i+1]=(byte)(c.G*c.A/255);bytes[i+2]=(byte)(c.R*c.A/255);bytes[i+3]=c.A;
         }Marshal.Copy(bytes,0,data.Scan0,bytes.Length);}finally{b.UnlockBits(data);}return b;
     }
-    public static Bitmap Edge(int w,int h,int side,Color[] palette,double strength){
+    public static Bitmap Edge(int w,int h,int side,Color[] palette,double strength,double phase=0){
         int depth=(side<2?h:w),length=(side<2?w:h);Color[] along=new Color[length];
         for(int i=0;i<length;i++){double pos=(double)i/Math.Max(1,length-1)*(palette.Length-1);int k=Math.Min(palette.Length-2,(int)pos);along[i]=Mix(palette[k],palette[k+1],pos-k);}
+        double[] gleam=new double[length];for(int i=0;i<length;i++){double position=(double)i/Math.Max(1,length-1);double delta=Math.Abs(position-phase);delta=Math.Min(delta,1-delta);gleam[i]=1+.16*Math.Exp(-delta*delta/.0018);}
         return Pixels(w,h,delegate(int x,int y){int d=side==0?y:side==1?h-1-y:side==2?x:w-1-x;if(side<2)d=Math.Min(d,Math.Min(x,w-1-x));double f=1-(double)d/(depth-1);
-            int alpha=(int)Math.Min(255,(d<5?255:255*Math.Pow(f,.92))*strength);return Color.FromArgb(alpha,along[side<2?x:y]);});
+            int axis=side<2?x:y;int alpha=(int)Math.Min(255,(d<5?255:255*Math.Pow(f,.92))*strength*gleam[axis]);return Color.FromArgb(alpha,along[axis]);});
     }
 }
 
 sealed class PointerTheme : IDisposable {
-    IntPtr original;bool enabled;string file;Process guard;public int ApplyCount;
+    static readonly uint[] CursorIds={32512,32649,32513};
+    readonly IntPtr[] originals=new IntPtr[3];bool enabled;string file;Process guard;public int ApplyCount;
     int style=0,intensity=85,size=100;Color tint=Color.FromArgb(75,95,245);DateTime applied=DateTime.MinValue;
     public void Configure(int nextStyle,Color color,int nextIntensity,int nextSize,bool immediate){
         bool geometry=style!=nextStyle||intensity!=nextIntensity||size!=nextSize;
         int delta=Math.Max(Math.Abs(tint.R-color.R),Math.Max(Math.Abs(tint.G-color.G),Math.Abs(tint.B-color.B)));
         if(!geometry&&delta==0)return;
         if(!immediate&&!geometry&&(delta<24||(DateTime.UtcNow-applied).TotalMilliseconds<400))return;
-        if(enabled){IntPtr h=PointerArt.CreateCursor(nextStyle,color,nextIntensity,nextSize);if(!Native.SetSystemCursor(h,32512))throw new System.ComponentModel.Win32Exception();ApplyCount++;applied=DateTime.UtcNow;}
+        if(enabled){ApplySet(true,nextStyle,color,nextIntensity,nextSize);ApplyCount++;applied=DateTime.UtcNow;}
         style=nextStyle;tint=color;intensity=nextIntensity;size=nextSize;
     }
     public static Bitmap DrawPointer(){return PointerArt.Render(0,Color.FromArgb(75,95,245),85,100);}
@@ -159,7 +161,7 @@ sealed class PointerTheme : IDisposable {
         for(int y=b.Height-1;y>=0;y--){byte[] mask=new byte[maskStride];for(int x=0;x<b.Width;x++)if(b.GetPixel(x,y).A==0)mask[x/8]|=(byte)(0x80>>(x%8));writer.Write(mask);}
     }}
     public PointerTheme(){
-        original=Native.CopyIcon(Native.LoadCursor(IntPtr.Zero,32512));
+        for(int i=0;i<CursorIds.Length;i++)originals[i]=Native.CopyIcon(Native.LoadCursor(IntPtr.Zero,(int)CursorIds[i]));
         file=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Pointeur-Halo.cur");WriteCursor(file);
         string ready="Local\\HaloPointerGuard_"+Process.GetCurrentProcess().Id;
         using(var signal=new EventWaitHandle(false,EventResetMode.ManualReset,ready)){
@@ -167,14 +169,18 @@ sealed class PointerTheme : IDisposable {
             if(!signal.WaitOne(5000))throw new Exception("La protection de restauration du pointeur ne répond pas.");
         }
     }
-    public void SetEnabled(bool value){if(enabled==value)return;IntPtr h=value?PointerArt.CreateCursor(style,tint,intensity,size):Native.CopyIcon(original);
-        if(h==IntPtr.Zero||!Native.SetSystemCursor(h,32512))throw new System.ComponentModel.Win32Exception();enabled=value;ApplyCount++;
+    void ApplySet(bool custom,int nextStyle,Color color,int nextIntensity,int nextSize){
+        for(int i=0;i<CursorIds.Length;i++){
+            IntPtr h=custom?PointerArt.CreateCursor(nextStyle,color,nextIntensity,nextSize,i):Native.CopyIcon(originals[i]);
+            if(h==IntPtr.Zero||!Native.SetSystemCursor(h,CursorIds[i])){if(h!=IntPtr.Zero)Native.DestroyIcon(h);throw new System.ComponentModel.Win32Exception();}
+        }
     }
-    public void Dispose(){SetEnabled(false);if(original!=IntPtr.Zero)Native.DestroyIcon(original);if(guard!=null)guard.Dispose();}
+    public void SetEnabled(bool value){if(enabled==value)return;try{ApplySet(value,style,tint,intensity,size);enabled=value;ApplyCount++;}catch{if(value)try{ApplySet(false,style,tint,intensity,size);}catch{}throw;}}
+    public void Dispose(){SetEnabled(false);foreach(IntPtr h in originals)if(h!=IntPtr.Zero)Native.DestroyIcon(h);if(guard!=null)guard.Dispose();}
     public static void Guard(int parent,string ready){
-        IntPtr saved=Native.CopyIcon(Native.LoadCursor(IntPtr.Zero,32512));
+        IntPtr[] saved=new IntPtr[3];for(int i=0;i<CursorIds.Length;i++)saved[i]=Native.CopyIcon(Native.LoadCursor(IntPtr.Zero,(int)CursorIds[i]));
         try{using(var p=Process.GetProcessById(parent)){using(var signal=EventWaitHandle.OpenExisting(ready))signal.Set();p.WaitForExit();}}
-        catch(ArgumentException){}finally{if(saved!=IntPtr.Zero)Native.SetSystemCursor(saved,32512);}
+        catch(ArgumentException){}finally{for(int i=0;i<CursorIds.Length;i++)if(saved[i]!=IntPtr.Zero)Native.SetSystemCursor(saved[i],CursorIds[i]);}
     }
 }
 
@@ -199,21 +205,21 @@ sealed class MonitorGlow : IDisposable {
     SceneDynamics scene=new SceneDynamics();public double VideoBoost {get{return scene.Boost;}}
     Color[][] palettes=new Color[4][];
     public MonitorGlow(Rectangle r){Bounds=r;for(int s=0;s<4;s++){Edges[s]=new Layer();palettes[s]=new Color[9];for(int i=0;i<9;i++)palettes[s][i]=Global;}}
-    public void Update(bool enabled,double strength,bool forceVideo,bool autoColor=true,Color fixedColor=default(Color),double width=1){
+    public void Update(bool enabled,double strength,bool forceVideo,bool autoColor=true,Color fixedColor=default(Color),double width=1,bool videoOnly=false){
         using(Bitmap small=Colors.Capture(Bounds)){
             if(PreviewFrame!=null)PreviewFrame.Dispose();PreviewFrame=(Bitmap)small.Clone();
             Rectangle content=Colors.ActiveContent(Bounds);
             Color main=autoColor?Colors.Dominant(small,content):fixedColor;Lightness=Lightness*.65+Colors.Brightness(small,content)*.35;
             scene.Update(small,content,forceVideo);
-            Global=autoColor?Colors.Mix(Global,Colors.Contrast(main,Lightness*(1-.35*VideoBoost)),.35):fixedColor;
-            if(!enabled){foreach(var edge in Edges)edge.Hide();return;}
+            Global=autoColor?Colors.Mix(Global,Colors.Contrast(main,Lightness*(1-.35*VideoBoost)),.18):fixedColor;
+            if(!enabled||(videoOnly&&VideoBoost<.18)){foreach(var edge in Edges)edge.Hide();return;}
             for(int s=0;s<4;s++)for(int k=0;k<9;k++){
                 int rw=Math.Max(1,content.Width*(s<2?25:40)/100),rh=Math.Max(1,content.Height*(s<2?40:30)/100);
                 int x=content.X+(s<2?(content.Width-rw)*k/8:s==2?0:content.Width-rw);
                 int y=content.Y+(s<2?(s==0?0:content.Height-rh):(content.Height-rh)*k/8);
                 Rectangle region=new Rectangle(x,y,rw,rh);
                 Color target=autoColor?Colors.Contrast(Colors.Mix(Colors.Dominant(small,region,main),main,.4),Lightness*(1-.35*VideoBoost)):fixedColor;
-                palettes[s][k]=autoColor?Colors.Mix(palettes[s][k],target,.32):target;
+                palettes[s][k]=autoColor?Colors.Mix(palettes[s][k],target,.18):target;
             }
             palettes[0][0]=palettes[2][0]=Colors.Mix(palettes[0][0],palettes[2][0],.5);
             palettes[0][8]=palettes[3][0]=Colors.Mix(palettes[0][8],palettes[3][0],.5);
@@ -225,7 +231,8 @@ sealed class MonitorGlow : IDisposable {
         for(int s=0;s<4;s++){
             int w=s<2?Bounds.Width:d,h=s<2?d:Bounds.Height-2*d;
             int x=Bounds.X+(s==3?Bounds.Width-d:0),y=Bounds.Y+(s==1?Bounds.Height-d:s>=2?d:0);
-            using(Bitmap b=Colors.Edge(w,h,s,palettes[s],strength*(1+VideoBoost*(.3+.2*Lightness))))Edges[s].Draw(b,x,y);
+            double phase=(Environment.TickCount&0x7fffffff)/5000.0%1.0;
+            using(Bitmap b=Colors.Edge(w,h,s,palettes[s],strength*(1+VideoBoost*(.3+.2*Lightness)),phase))Edges[s].Draw(b,x,y);
         }
     }
     public void Hide(){foreach(var e in Edges)e.Hide();}
