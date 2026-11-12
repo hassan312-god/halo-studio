@@ -2,7 +2,7 @@
 
 <img src="logo.png" width="120" alt="Halo Studio">
 
-Application Windows de lumière ambiante : un halo qui suit les couleurs des applications et des vidéos, avec huit styles de pointeur lumineux appliqués aux quatorze pointeurs de Windows (flèche, lien, texte, attente, aide, redimensionnement, déplacement…).
+Application Windows de lumière ambiante : un halo qui suit les couleurs des applications et des vidéos, avec huit styles de pointeur lumineux appliqués aux dix-sept pointeurs de Windows (flèche, lien, texte, attente, aide, redimensionnement, déplacement…).
 
 ## Installer
 
@@ -19,7 +19,7 @@ Cette bêta n’est pas signée avec un certificat Authenticode. Windows peut do
 - **Moteur** : capture, analyse et dessin sur un fil dédié, sans allocation par image ; jusqu’à 30 images par seconde pendant une vidéo, 10 sur un écran immobile. La fenêtre de réglages ne dépend plus du halo.
 - **Vidéo** : la zone de la vidéo est repérée (un défilement de page ne compte pas), les barres noires sont écartées, les couleurs sont lues bord par bord sur l’image ; réaction immédiate en plein écran. Le **mode cinéma** élargit et renforce le halo pendant les vidéos.
 - **Interface** : nouvelle fenêtre dans le style des Paramètres de Windows 11, avec accueil, recherche de réglages, thème clair ou sombre suivant Windows.
-- **Pointeurs** : les quatorze pointeurs de Windows prennent le thème ; douze couleurs proposées.
+- **Pointeurs** : les dix-sept pointeurs de Windows prennent le thème ; douze couleurs proposées.
 
 ## Réglages
 

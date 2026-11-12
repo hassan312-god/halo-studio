@@ -197,8 +197,9 @@ static class Colors {
 }
 
 sealed class PointerTheme : IDisposable {
-    // Arrow, link, text, busy, working in background, precision, help, unavailable, four resize directions, move, alternate.
-    public static readonly uint[] CursorIds={32512,32649,32513,32514,32650,32515,32651,32648,32645,32644,32642,32643,32646,32516};
+    // The seventeen cursors of a Windows scheme: arrow, link, text, busy, working in background, precision, help,
+    // unavailable, four resize directions, move, alternate, handwriting, location and person select.
+    public static readonly uint[] CursorIds={32512,32649,32513,32514,32650,32515,32651,32648,32645,32644,32642,32643,32646,32516,32631,32671,32672};
     readonly IntPtr[] originals=new IntPtr[CursorIds.Length];bool enabled;string file;Process guard;public int ApplyCount;
     int style=0,intensity=85,size=100;Color tint=Color.FromArgb(75,95,245);DateTime applied=DateTime.MinValue;
     public void Configure(int nextStyle,Color color,int nextIntensity,int nextSize,bool immediate){

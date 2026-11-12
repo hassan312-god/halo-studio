@@ -36,11 +36,12 @@ static class PointerArt {
     public static readonly string[] Names={"Pointe douce","Flèche classique","Flèche fine","Diamant","Croix précise","Flèche contrastée","Chevron lumineux","Pointe futuriste"};
     public static Point Hotspot(int style,int size){double scale=size/100.0;return style==3||style==4?new Point((int)(32*scale),(int)(32*scale)):new Point((int)(17*scale),(int)(14*scale));}
     // One themed shape per Windows cursor, in the order of PointerTheme.CursorIds.
-    public static readonly string[] Roles={"Flèche","Lien","Texte","Occupé","Travail en arrière-plan","Précision","Aide","Indisponible","Redimensionner haut-bas","Redimensionner gauche-droite","Redimensionner diagonale 1","Redimensionner diagonale 2","Déplacer","Autre sélection"};
+    public static readonly string[] Roles={"Flèche","Lien","Texte","Occupé","Travail en arrière-plan","Précision","Aide","Indisponible","Redimensionner haut-bas","Redimensionner gauche-droite","Redimensionner diagonale 1","Redimensionner diagonale 2","Déplacer","Autre sélection","Écriture manuscrite","Sélection d’emplacement","Sélection de personne"};
     public static Point RoleHotspot(int style,int size,int role){
         double scale=size/100.0;
         if(role==0||role==4||role==6)return Hotspot(style,size);
-        if(role==1)return new Point((int)(27*scale),(int)(15*scale));
+        if(role==1||role==15||role==16)return new Point((int)(27*scale),(int)(15*scale));
+        if(role==14)return new Point((int)(19*scale),(int)(16*scale));
         if(role==13)return new Point((int)(32*scale),(int)(15*scale));
         return new Point((int)(32*scale),(int)(31*scale));
     }
@@ -48,7 +49,12 @@ static class PointerArt {
     static void Turned(GraphicsPath p,PointF[] points,float angle){p.AddPolygon(points);using(var m=new Matrix()){m.RotateAt(angle,new PointF(15,17));p.Transform(m);}}
     static GraphicsPath Shape(int style,int role=0){
         var p=new GraphicsPath();
-        if(role==1){p.AddPolygon(new[]{new PointF(8,1),new PointF(13,1),new PointF(14,18),new PointF(18,14),new PointF(22,15),new PointF(25,18),new PointF(29,19),new PointF(31,23),new PointF(27,35),new PointF(11,35),new PointF(3,23),new PointF(5,19),new PointF(9,23)});}
+        if(role==1||role==15||role==16){p.FillMode=FillMode.Winding;p.AddPolygon(new[]{new PointF(8,1),new PointF(13,1),new PointF(14,18),new PointF(18,14),new PointF(22,15),new PointF(25,18),new PointF(29,19),new PointF(31,23),new PointF(27,35),new PointF(11,35),new PointF(3,23),new PointF(5,19),new PointF(9,23)});
+            // The location and person cursors of Windows are the link hand with a badge.
+            if(role==15){p.AddEllipse(34,20,11,11);p.AddPolygon(new[]{new PointF(35.2f,29.5f),new PointF(43.8f,29.5f),new PointF(39.5f,36)});}
+            if(role==16){p.AddEllipse(36,19,7,7);p.AddPolygon(new[]{new PointF(33,36),new PointF(34,30),new PointF(37,27.5f),new PointF(42,27.5f),new PointF(45,30),new PointF(46,36)});}
+        }
+        else if(role==14){p.AddPolygon(new[]{new PointF(2,2),new PointF(10,4.5f),new PointF(32,26.5f),new PointF(26.5f,32),new PointF(4.5f,10)});}
         else if(role==2){p.AddPolygon(new[]{new PointF(3,1),new PointF(27,1),new PointF(27,5),new PointF(18,5),new PointF(18,30),new PointF(27,30),new PointF(27,34),new PointF(3,34),new PointF(3,30),new PointF(12,30),new PointF(12,5),new PointF(3,5)});}
         else if(role==3){p.AddEllipse(3,5,24,24);p.AddEllipse(9,11,12,12);p.AddEllipse(13,15,4,4);}
         else if(role==5){p.AddPolygon(new[]{new PointF(14,3),new PointF(16,3),new PointF(16,16),new PointF(29,16),new PointF(29,18),new PointF(16,18),new PointF(16,31),new PointF(14,31),new PointF(14,18),new PointF(1,18),new PointF(1,16),new PointF(14,16)});}
@@ -77,7 +83,7 @@ static class PointerArt {
     // Glow is the blurred silhouette of the actual pointer, never a radial circle. It depends only on the shape and
     // size, so it is computed once and merely recolored when the screen color changes.
     static double[] Glow(int style,int size,int role,int n,GraphicsPath path){
-        int key=style|(role<<4)|(size<<8);double[] glow;
+        int key=style|(role<<4)|(size<<10);double[] glow;
         lock(glows)if(glows.TryGetValue(key,out glow))return glow;
         double scale=size/100.0;int[] mask;
         using(var bitmap=new Bitmap(n,n,PixelFormat.Format32bppArgb)){using(var g=Graphics.FromImage(bitmap)){g.SmoothingMode=SmoothingMode.AntiAlias;g.FillPath(Brushes.White,path);}mask=Colors.ToPixels(bitmap);}
@@ -312,7 +318,7 @@ sealed class StudioForm : Form {
         var styles=pointerCard.Add(new TileStrip{Count=PointerArt.Names.Length,Names=PointerArt.Names,AccessibleName="Styles de pointeur",Painter=delegate(Graphics g,Rectangle r,int i){Bitmap b=art[i];g.DrawImageUnscaled(b,r.X+(r.Width-b.Width)/2-Theme.S(3),r.Y+(r.Height-b.Height)/2-Theme.S(2));}});
         styles.Picked+=delegate(int i){StyleBox.SelectedIndex=i;};binders.Add(delegate{styles.SelectedIndex=s.PointerStyle;});
         var pointerSliders=mouse.Add(new Card());
-        var family=mouse.Add(new Card("Tous les pointeurs","Chaque pointeur de Windows reçoit le thème : lien, texte, attente, redimensionnement, déplacement…"));
+        var family=mouse.Add(new Card("Tous les pointeurs","Chaque pointeur de Windows reçoit le thème : lien, texte, attente, aide, redimensionnement, déplacement, stylet…"));
         var roleStrip=family.Add(new TileStrip{Count=PointerArt.Roles.Length,Names=PointerArt.Roles,AccessibleName="Pointeurs thémés",TabStop=false,Painter=delegate(Graphics g,Rectangle r,int i){
             using(var b=PointerArt.Render(s.PointerStyle,s.AutoColor?liveColor:s.FixedColor,s.PointerIntensity,80,i)){Point hot=PointerArt.RoleHotspot(s.PointerStyle,80,i);bool arrow=i==0||i==4||i==6;g.DrawImageUnscaled(b,r.X+r.Width/2-(arrow?hot.X+Theme.S(9):b.Width*47/100),r.Y+r.Height/2-(arrow?hot.Y+Theme.S(11):b.Height*46/100));}}});
         binders.Add(delegate{roleStrip.Invalidate();});

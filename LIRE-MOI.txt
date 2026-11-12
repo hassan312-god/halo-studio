@@ -12,8 +12,9 @@ Couleur unique : choisir une teinte avec la palette ou le sélecteur.
 SOURIS
 Huit styles, taille et intensité du contour lumineux réglables.
 La lueur est intégrée au curseur Windows : elle suit exactement sa forme.
-Les quatorze pointeurs de Windows adoptent le thème : lien, texte, attente,
-aide, précision, indisponible, redimensionnement, déplacement.
+Les dix-sept pointeurs de Windows adoptent le thème : lien, texte, attente,
+aide, précision, indisponible, redimensionnement, déplacement, stylet,
+emplacement et personne.
 À la pause ou à la fermeture, les pointeurs d’origine sont restaurés.
 
 ÉCRAN
