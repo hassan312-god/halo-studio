@@ -33,6 +33,20 @@ jobs:
         with:
           name: self-test
           path: build/self-test
+      # A ready-to-run installer for every build of main, downloadable as a plain .exe (artifacts are always zipped).
+      # Its tag is not a version number, so installed copies never take it for an update.
+      - name: Publish latest build
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete dernier-build --cleanup-tag --yes *> $null
+          $global:LASTEXITCODE = 0
+          $version = (Select-String -Path BuildInfo.cs -Pattern 'Version="([^"]+)"').Matches[0].Groups[1].Value
+          $files = Get-ChildItem build/HaloStudio-Setup-*.exe,build/*.sha256 | ForEach-Object FullName
+          gh release create dernier-build @files --target $env:GITHUB_SHA --prerelease --title "Halo Studio $version - dernier build" --notes "Installateur du dernier build de la branche principale ($($env:GITHUB_SHA.Substring(0,7))). Version d'essai : elle n'est pas proposée en mise à jour automatique."
+          if ($LASTEXITCODE -ne 0) { throw 'Publishing the latest build failed.' }
       - name: Publish tagged beta
         if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
