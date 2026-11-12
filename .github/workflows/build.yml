@@ -22,6 +22,17 @@ jobs:
           path: |
             build/HaloStudio-Setup-*.exe
             build/*.sha256
+      - name: Self-test
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath ./Halo.exe -ArgumentList '--self-test', "$PWD\build\self-test" -Wait -PassThru
+          Get-Content build/self-test/self-test.txt
+          if ($p.ExitCode -ne 0) { throw 'The self-test reported a failure.' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: self-test
+          path: build/self-test
       - name: Publish tagged beta
         if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh

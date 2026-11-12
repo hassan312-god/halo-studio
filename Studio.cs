@@ -11,34 +11,64 @@ using System.Threading;
 using System.Runtime.InteropServices;
 
 public sealed class HaloSettings {
-    public bool AutoColor=true,ScreenEnabled=false,PointerEnabled=true,VideoBoost=false,VideoOnly=true,VideoModeConfigured=false,AutoUpdates=true;
-    public int ColorArgb=Color.FromArgb(75,95,245).ToArgb(),ScreenIntensity=100,PointerIntensity=85,PointerStyle=0,PointerSize=100,Width=100;
+    public bool AutoColor=true,ScreenEnabled=false,PointerEnabled=true,VideoBoost=true,VideoOnly=true,VideoModeConfigured=false,AutoUpdates=true;
+    public int ColorArgb=Color.FromArgb(75,95,245).ToArgb(),ScreenIntensity=100,PointerIntensity=85,PointerStyle=0,PointerSize=100,Width=100,SettingsVersion=0;
     public Color FixedColor {get{return Color.FromArgb(ColorArgb);}}
     public static string DataDirectory {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"HaloStudio");}}
     public static string FileName {get{return Path.Combine(DataDirectory,"reglages.xml");}}
     public void Normalize(){ScreenIntensity=Clamp(ScreenIntensity,0,100);PointerIntensity=Clamp(PointerIntensity,0,100);PointerStyle=Clamp(PointerStyle,0,7);PointerSize=Clamp(PointerSize,80,160);Width=Clamp(Width,50,180);ColorArgb=Color.FromArgb(255,FixedColor.R,FixedColor.G,FixedColor.B).ToArgb();}
     static int Clamp(int x,int min,int max){return Math.Max(min,Math.Min(max,x));}
     public static HaloSettings Load(){
-        try{using(var stream=File.OpenRead(FileName)){var s=(HaloSettings)new XmlSerializer(typeof(HaloSettings)).Deserialize(stream);if(!s.VideoModeConfigured){s.ScreenEnabled=false;s.VideoOnly=true;s.VideoModeConfigured=true;}s.Normalize();return s;}}catch{}
+        try{using(var stream=File.OpenRead(FileName)){var s=(HaloSettings)new XmlSerializer(typeof(HaloSettings)).Deserialize(stream);if(!s.VideoModeConfigured){s.ScreenEnabled=false;s.VideoOnly=true;s.VideoModeConfigured=true;}if(s.SettingsVersion<5){s.VideoBoost=true;s.SettingsVersion=5;}s.Normalize();return s;}}catch{}
         var fallback=new HaloSettings();
-        try{var p=File.ReadAllLines(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"preferences.txt"));fallback.ScreenEnabled=bool.Parse(p[0]);fallback.PointerEnabled=bool.Parse(p[1]);fallback.ScreenIntensity=(int)(double.Parse(p[2],System.Globalization.CultureInfo.InvariantCulture)*100);fallback.VideoBoost=p.Length>4&&bool.Parse(p[4]);}catch{}
-        fallback.ScreenEnabled=false;fallback.VideoOnly=true;fallback.VideoModeConfigured=true;return fallback;
+        try{var p=File.ReadAllLines(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"preferences.txt"));fallback.ScreenEnabled=bool.Parse(p[0]);fallback.PointerEnabled=bool.Parse(p[1]);fallback.ScreenIntensity=(int)(double.Parse(p[2],System.Globalization.CultureInfo.InvariantCulture)*100);}catch{}
+        fallback.ScreenEnabled=false;fallback.VideoOnly=true;fallback.VideoModeConfigured=true;fallback.SettingsVersion=5;return fallback;
     }
-    public void Save(){Normalize();Directory.CreateDirectory(DataDirectory);string temp=FileName+".tmp";using(var stream=File.Create(temp))new XmlSerializer(typeof(HaloSettings)).Serialize(stream,this);if(File.Exists(FileName))File.Replace(temp,FileName,null);else File.Move(temp,FileName);}
+    public void Save(){Normalize();SettingsVersion=5;Directory.CreateDirectory(DataDirectory);string temp=FileName+".tmp";using(var stream=File.Create(temp))new XmlSerializer(typeof(HaloSettings)).Serialize(stream,this);if(File.Exists(FileName))File.Replace(temp,FileName,null);else File.Move(temp,FileName);}
 }
 
 static class Branding {
-    public static Icon AppIcon(){using(var stream=System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("Halo.Icon")){return stream==null?(Icon)SystemIcons.Application.Clone():new Icon(stream);}}
+    public static Icon AppIcon(){using(var stream=System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("Halo.Icon")){try{if(stream!=null)return new Icon(stream);}catch{}return (Icon)SystemIcons.Application.Clone();}}
     public static Bitmap Logo(){using(var stream=System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("Halo.Logo")){if(stream==null)return null;using(var image=Image.FromStream(stream))return new Bitmap(image);}}
 }
 
 static class PointerArt {
     public static readonly string[] Names={"Pointe douce","Flèche classique","Flèche fine","Diamant","Croix précise","Flèche contrastée","Chevron lumineux","Pointe futuriste"};
     public static Point Hotspot(int style,int size){double scale=size/100.0;return style==3||style==4?new Point((int)(32*scale),(int)(32*scale)):new Point((int)(17*scale),(int)(14*scale));}
+    // One themed shape per Windows cursor, in the order of PointerTheme.CursorIds.
+    public static readonly string[] Roles={"Flèche","Lien","Texte","Occupé","Travail en arrière-plan","Précision","Aide","Indisponible","Redimensionner haut-bas","Redimensionner gauche-droite","Redimensionner diagonale 1","Redimensionner diagonale 2","Déplacer","Autre sélection","Écriture manuscrite","Sélection d’emplacement","Sélection de personne"};
+    public static Point RoleHotspot(int style,int size,int role){
+        double scale=size/100.0;
+        if(role==0||role==4||role==6)return Hotspot(style,size);
+        if(role==1||role==15||role==16)return new Point((int)(27*scale),(int)(15*scale));
+        if(role==14)return new Point((int)(19*scale),(int)(16*scale));
+        if(role==13)return new Point((int)(32*scale),(int)(15*scale));
+        return new Point((int)(32*scale),(int)(31*scale));
+    }
+    static readonly PointF[] DoubleArrow={new PointF(15,1),new PointF(22,9),new PointF(17.5f,9),new PointF(17.5f,25),new PointF(22,25),new PointF(15,33),new PointF(8,25),new PointF(12.5f,25),new PointF(12.5f,9),new PointF(8,9)};
+    static void Turned(GraphicsPath p,PointF[] points,float angle){p.AddPolygon(points);using(var m=new Matrix()){m.RotateAt(angle,new PointF(15,17));p.Transform(m);}}
     static GraphicsPath Shape(int style,int role=0){
         var p=new GraphicsPath();
-        if(role==1){p.AddPolygon(new[]{new PointF(8,1),new PointF(13,1),new PointF(14,18),new PointF(18,14),new PointF(22,15),new PointF(25,18),new PointF(29,19),new PointF(31,23),new PointF(27,35),new PointF(11,35),new PointF(3,23),new PointF(5,19),new PointF(9,23)});using(var hand=new Matrix()){hand.Translate(17,14);p.Transform(hand);}return p;}
-        if(role==2){p.AddPolygon(new[]{new PointF(3,1),new PointF(27,1),new PointF(27,5),new PointF(18,5),new PointF(18,30),new PointF(27,30),new PointF(27,34),new PointF(3,34),new PointF(3,30),new PointF(12,30),new PointF(12,5),new PointF(3,5)});using(var beam=new Matrix()){beam.Translate(17,14);p.Transform(beam);}return p;}
+        if(role==1||role==15||role==16){p.FillMode=FillMode.Winding;p.AddPolygon(new[]{new PointF(8,1),new PointF(13,1),new PointF(14,18),new PointF(18,14),new PointF(22,15),new PointF(25,18),new PointF(29,19),new PointF(31,23),new PointF(27,35),new PointF(11,35),new PointF(3,23),new PointF(5,19),new PointF(9,23)});
+            // The location and person cursors of Windows are the link hand with a badge.
+            if(role==15){p.AddEllipse(34,20,11,11);p.AddPolygon(new[]{new PointF(35.2f,29.5f),new PointF(43.8f,29.5f),new PointF(39.5f,36)});}
+            if(role==16){p.AddEllipse(36,19,7,7);p.AddPolygon(new[]{new PointF(33,36),new PointF(34,30),new PointF(37,27.5f),new PointF(42,27.5f),new PointF(45,30),new PointF(46,36)});}
+        }
+        else if(role==14){p.AddPolygon(new[]{new PointF(2,2),new PointF(10,4.5f),new PointF(32,26.5f),new PointF(26.5f,32),new PointF(4.5f,10)});}
+        else if(role==2){p.AddPolygon(new[]{new PointF(3,1),new PointF(27,1),new PointF(27,5),new PointF(18,5),new PointF(18,30),new PointF(27,30),new PointF(27,34),new PointF(3,34),new PointF(3,30),new PointF(12,30),new PointF(12,5),new PointF(3,5)});}
+        else if(role==3){p.AddEllipse(3,5,24,24);p.AddEllipse(9,11,12,12);p.AddEllipse(13,15,4,4);}
+        else if(role==5){p.AddPolygon(new[]{new PointF(14,3),new PointF(16,3),new PointF(16,16),new PointF(29,16),new PointF(29,18),new PointF(16,18),new PointF(16,31),new PointF(14,31),new PointF(14,18),new PointF(1,18),new PointF(1,16),new PointF(14,16)});}
+        else if(role==7){p.AddEllipse(3,5,24,24);p.AddEllipse(7.5f,9.5f,15,15);var bar=new GraphicsPath();Turned(bar,new[]{new PointF(13.2f,10.8f),new PointF(16.8f,10.8f),new PointF(16.8f,23.2f),new PointF(13.2f,23.2f)},-45);p.AddPath(bar,false);bar.Dispose();}
+        else if(role==8)Turned(p,DoubleArrow,0);
+        else if(role==9)Turned(p,DoubleArrow,90);
+        else if(role==10)Turned(p,DoubleArrow,-45);
+        else if(role==11)Turned(p,DoubleArrow,45);
+        else if(role==12){p.AddPolygon(new[]{new PointF(15,1),new PointF(20,7),new PointF(17,7),new PointF(17,15),new PointF(25,15),new PointF(25,12),new PointF(31,17),new PointF(25,22),new PointF(25,19),new PointF(17,19),new PointF(17,27),new PointF(20,27),new PointF(15,33),new PointF(10,27),new PointF(13,27),new PointF(13,19),new PointF(5,19),new PointF(5,22),new PointF(-1,17),new PointF(5,12),new PointF(5,15),new PointF(13,15),new PointF(13,7),new PointF(10,7)});}
+        else if(role==13){p.AddPolygon(new[]{new PointF(15,1),new PointF(24,12),new PointF(18,12),new PointF(18,33),new PointF(12,33),new PointF(12,12),new PointF(6,12)});}
+        if(role!=0&&role!=4&&role!=6){using(var m=new Matrix()){m.Translate(17,14);p.Transform(m);}return p;}
+        // Arrow-based cursors keep the chosen style and gain a badge: a ring while working, a question mark for help.
+        if(role==4){p.AddEllipse(21,22,13,13);p.AddEllipse(25,26,5,5);}
+        if(role==6)using(var format=new StringFormat())p.AddString("?",FontFamily.GenericSansSerif,(int)FontStyle.Bold,19,new PointF(18,17),format);
         if(style==0)p.AddPolygon(new[]{new PointF(0,0),new PointF(25,9),new PointF(15,16),new PointF(9,29)});
         if(style==1)p.AddPolygon(new[]{new PointF(0,0),new PointF(0,29),new PointF(8,23),new PointF(13,34),new PointF(19,31),new PointF(14,21),new PointF(27,21)});
         if(style==2)p.AddPolygon(new[]{new PointF(0,0),new PointF(9,29),new PointF(13,17),new PointF(28,11)});
@@ -49,17 +79,27 @@ static class PointerArt {
         if(style==7)p.AddPolygon(new[]{new PointF(0,0),new PointF(31,17),new PointF(5,33),new PointF(11,18)});
         using(var m=new Matrix()){m.Translate(17,14);p.Transform(m);}return p;
     }
+    static readonly Dictionary<int,double[]> glows=new Dictionary<int,double[]>();
+    // Glow is the blurred silhouette of the actual pointer, never a radial circle. It depends only on the shape and
+    // size, so it is computed once and merely recolored when the screen color changes.
+    static double[] Glow(int style,int size,int role,int n,GraphicsPath path){
+        int key=style|(role<<4)|(size<<10);double[] glow;
+        lock(glows)if(glows.TryGetValue(key,out glow))return glow;
+        double scale=size/100.0;int[] mask;
+        using(var bitmap=new Bitmap(n,n,PixelFormat.Format32bppArgb)){using(var g=Graphics.FromImage(bitmap)){g.SmoothingMode=SmoothingMode.AntiAlias;g.FillPath(Brushes.White,path);}mask=Colors.ToPixels(bitmap);}
+        int radius=Math.Max(2,(int)(6*scale));double sigma=radius/2.0;double[] kernel=new double[2*radius+1];double sum=0;
+        for(int i=-radius;i<=radius;i++){kernel[i+radius]=Math.Exp(-(i*i)/(2*sigma*sigma));sum+=kernel[i+radius];}for(int i=0;i<kernel.Length;i++)kernel[i]/=sum;
+        double[] horizontal=new double[n*n];glow=new double[n*n];
+        for(int y=0;y<n;y++)for(int x=0;x<n;x++)for(int k=-radius;k<=radius;k++)if(x+k>=0&&x+k<n)horizontal[y*n+x]+=((mask[y*n+x+k]>>24)&255)/255.0*kernel[k+radius];
+        for(int y=0;y<n;y++)for(int x=0;x<n;x++)for(int k=-radius;k<=radius;k++)if(y+k>=0&&y+k<n)glow[y*n+x]+=horizontal[(y+k)*n+x]*kernel[k+radius];
+        lock(glows)glows[key]=glow;return glow;
+    }
     public static Bitmap Render(int style,Color color,int intensity,int size,int role=0){
         int n=(int)(68*size/100.0);double scale=size/100.0;
-        using(var mask=new Bitmap(n,n,PixelFormat.Format32bppArgb))using(var path=Shape(style,role)){
+        using(var path=Shape(style,role)){
             using(var m=new Matrix()){m.Scale((float)scale,(float)scale);path.Transform(m);}
-            using(var g=Graphics.FromImage(mask)){g.SmoothingMode=SmoothingMode.AntiAlias;g.FillPath(Brushes.White,path);}
-            // Glow is the blurred silhouette of the actual pointer, never a radial circle.
-            double[,] alpha=new double[n,n];for(int y=0;y<n;y++)for(int x=0;x<n;x++)alpha[x,y]=mask.GetPixel(x,y).A/255.0;
-            int radius=Math.Max(2,(int)(6*scale));double sigma=radius/2.0;double[] kernel=new double[2*radius+1];double sum=0;
-            for(int i=-radius;i<=radius;i++){kernel[i+radius]=Math.Exp(-(i*i)/(2*sigma*sigma));sum+=kernel[i+radius];}for(int i=0;i<kernel.Length;i++)kernel[i]/=sum;
-            double[,] horizontal=new double[n,n];for(int y=0;y<n;y++)for(int x=0;x<n;x++)for(int k=-radius;k<=radius;k++)if(x+k>=0&&x+k<n)horizontal[x,y]+=alpha[x+k,y]*kernel[k+radius];
-            Bitmap result=Colors.Pixels(n,n,delegate(int x,int y){double a=0;for(int k=-radius;k<=radius;k++)if(y+k>=0&&y+k<n)a+=horizontal[x,y+k]*kernel[k+radius];return Color.FromArgb((int)Math.Min(250,a*620*intensity/100.0),color);});
+            double[] glow=Glow(style,size,role,n,path);
+            Bitmap result=Colors.Pixels(n,n,delegate(int x,int y){return Color.FromArgb((int)Math.Min(250,glow[y*n+x]*620*intensity/100.0),color);});
             using(var g=Graphics.FromImage(result)){
                 g.SmoothingMode=SmoothingMode.AntiAlias;
                 if(intensity>0)using(var line=new Pen(Color.FromArgb((int)(240*intensity/100.0),color),(float)(5*scale))){line.LineJoin=LineJoin.Round;g.DrawPath(line,path);}
@@ -75,7 +115,7 @@ static class PointerArt {
     public static IntPtr CreateCursor(int style,Color color,int intensity,int size,int role=0){
         using(var b=Render(style,color,intensity,size,role)){
             IntPtr pixels=b.GetHbitmap(Color.FromArgb(0));IntPtr mask=CreateBitmap(b.Width,b.Height,1,1,new byte[((b.Width+15)/16)*2*b.Height]);
-            try{Point hot=role==0?Hotspot(style,size):new Point((int)(32*size/100.0),(int)(31*size/100.0));var info=new ICONINFO{Icon=false,X=(uint)hot.X,Y=(uint)hot.Y,Mask=mask,Color=pixels};IntPtr cursor=CreateIconIndirect(ref info);if(cursor==IntPtr.Zero)throw new System.ComponentModel.Win32Exception();return cursor;}
+            try{Point hot=RoleHotspot(style,size,role);var info=new ICONINFO{Icon=false,X=(uint)hot.X,Y=(uint)hot.Y,Mask=mask,Color=pixels};IntPtr cursor=CreateIconIndirect(ref info);if(cursor==IntPtr.Zero)throw new System.ComponentModel.Win32Exception();return cursor;}
             finally{Native.DeleteObject(pixels);Native.DeleteObject(mask);}
         }
     }
@@ -99,134 +139,344 @@ sealed class BrightnessControl {
     }
 }
 
-sealed class PreviewPanel : Control {
-    public HaloSettings Settings;public Color LiveColor=Color.RoyalBlue;public int Brightness=50;public bool Paused,Light=true,VideoDetected;Bitmap frame;
-    public PreviewPanel(){DoubleBuffered=true;BackColor=Color.FromArgb(250,250,252);Size=new Size(315,480);}
+// Miniature screen showing the live capture with the halo and pointer as they are configured.
+sealed class PreviewPanel : FluentControl {
+    public HaloSettings Settings;public Color LiveColor=Color.RoyalBlue;public int Brightness=100;public bool Paused,VideoDetected;Bitmap frame;
+    public PreviewPanel(){Size=new Size(Theme.S(176),Theme.S(110));AccessibleName="Aperçu en temps réel";}
     public void SetFrame(Bitmap image){if(frame!=null)frame.Dispose();frame=image==null?null:(Bitmap)image.Clone();Invalidate();}
+    public void SetFrame(int[] pixels){if(frame!=null)frame.Dispose();frame=pixels==null?null:Colors.FromPixels(pixels,ScreenGrabber.W,ScreenGrabber.H,PixelFormat.Format32bppRgb);Invalidate();}
     protected override void Dispose(bool disposing){if(disposing&&frame!=null)frame.Dispose();base.Dispose(disposing);}
     public void RefreshState(Color color,bool paused){if(color.ToArgb()!=LiveColor.ToArgb()||Paused!=paused){LiveColor=color;Paused=paused;Invalidate();}}
     protected override void OnPaint(PaintEventArgs e){
-        base.OnPaint(e);var g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;float previewScale=Math.Min(Width/310f,Height/480f);g.ScaleTransform(previewScale,previewScale);var s=Settings??new HaloSettings();Color color=s.AutoColor?LiveColor:s.FixedColor;
-        using(var title=new Font("Segoe UI",12,FontStyle.Bold))g.DrawString("APERÇU EN TEMPS RÉEL",title,Brushes.MidnightBlue,20,24);
-        using(var text=new Font("Segoe UI",9))g.DrawString(frame!=null?"Écran actuel · synchronisé":"En attente de l’écran…",text,Brushes.SlateGray,20,57);
-        Rectangle display=new Rectangle(20,89,270,176);int w=display.Width,h=display.Height;
-        using(var scene=new Bitmap(w,h))using(var sg=Graphics.FromImage(scene)){
-            if(frame!=null)sg.DrawImage(frame,new Rectangle(0,0,w,h));else sg.Clear(Color.FromArgb(238,242,248));
-            if(!Paused&&(s.ScreenEnabled||(s.VideoOnly&&VideoDetected))){int d=Math.Max(14,(int)((s.VideoBoost?32:22)*s.Width/100.0));d=Math.Min(60,d);Color[] palette={color,color};
-                for(int side=0;side<4;side++)using(var b=Colors.Edge(side<2?w:d,side<2?d:h-2*d,side,palette,s.ScreenIntensity/100.0*(s.VideoBoost?1.4:1)))sg.DrawImageUnscaled(b,side==3?w-d:0,side==1?h-d:side>=2?d:0);
+        var g=e.Graphics;var s=Settings??new HaloSettings();Color color=s.AutoColor?LiveColor:s.FixedColor;
+        int bezel=Math.Max(3,Theme.S(4)),w=Width-2*bezel,h=Height-2*bezel;if(w<20||h<20)return;
+        using(var scene=new Bitmap(w,h,PixelFormat.Format32bppPArgb))using(var sg=Graphics.FromImage(scene)){
+            sg.InterpolationMode=InterpolationMode.HighQualityBilinear;
+            if(frame!=null)sg.DrawImage(frame,new Rectangle(0,0,w,h));else sg.Clear(Theme.Dark?Color.FromArgb(52,56,66):Color.FromArgb(226,232,242));
+            if(!Paused&&(s.ScreenEnabled||(s.VideoOnly&&VideoDetected))){
+                int d=Math.Max(6,Math.Min(h/3,(int)(h*(s.VideoBoost&&VideoDetected?.2:.14)*s.Width/100.0)));Color[] palette={color,color};
+                for(int side=0;side<4;side++)using(var b=Colors.Edge(side<2?w:d,side<2?d:h-2*d,side,palette,s.ScreenIntensity/100.0*(VideoDetected?1.3:1)))sg.DrawImageUnscaled(b,side==3?w-d:0,side==1?h-d:side>=2?d:0);
             }
-            if(s.PointerEnabled&&!Paused)using(var pointer=PointerArt.Render(s.PointerStyle,color,s.PointerIntensity,s.PointerSize))sg.DrawImageUnscaled(pointer,w/2-34,h/2-34);
-            g.DrawImageUnscaled(scene,display.Location);
-        }
-        using(var frame=new Pen(Color.FromArgb(45,55,76),5))g.DrawRectangle(frame,display);
-        using(var stand=new Pen(Color.FromArgb(75,86,109),7)){g.DrawLine(stand,Width/2,270,Width/2,291);g.DrawLine(stand,Width/2-37,294,Width/2+37,294);}
-        using(var text=new Font("Segoe UI",9)){
-            g.DrawString("Halo écran    "+s.ScreenIntensity+" %",text,Brushes.MidnightBlue,20,320);
-            g.DrawString("Halo souris    "+s.PointerIntensity+" %",text,Brushes.MidnightBlue,20,345);
-            g.DrawString("Écran du PC  "+Brightness+" %",text,Brushes.MidnightBlue,20,370);
-            g.DrawString(Paused?"Effets en pause":"Les réglages s’appliquent en direct.",text,Brushes.SlateGray,20,411);
-            g.DrawString("Capture locale, jamais enregistrée.",text,Brushes.SlateGray,20,436);
+            if(s.PointerEnabled&&!Paused)using(var pointer=PointerArt.Render(s.PointerStyle,color,s.PointerIntensity,s.PointerSize)){
+                int size=pointer.Width*h/190;sg.DrawImage(pointer,new Rectangle(w/2-size/3,h/2-size/3,size,size));
+            }
+            // The hardware brightness can only be suggested here: a veil stands in for a dimmer panel.
+            if(Brightness<100)using(var veil=new SolidBrush(Color.FromArgb((100-Brightness)*140/100,0,0,0)))sg.FillRectangle(veil,0,0,w,h);
+            g.SmoothingMode=SmoothingMode.AntiAlias;
+            using(var path=Theme.Round(new RectangleF(0,0,Width-1,Height-1),Theme.S(7)))using(var brush=new SolidBrush(Color.FromArgb(16,17,20)))g.FillPath(brush,path);
+            using(var clip=Theme.Round(new RectangleF(bezel,bezel,w,h),Theme.S(3))){var state=g.Save();g.SetClip(clip);g.DrawImageUnscaled(scene,bezel,bezel);g.Restore(state);}
         }
     }
 }
 
-sealed class SettingsCard : Panel {
-    public SettingsCard(){DoubleBuffered=true;BackColor=Color.White;Padding=new Padding(15);}
-    static GraphicsPath Rounded(Rectangle r,int radius){var p=new GraphicsPath();int d=radius*2;p.AddArc(r.Left,r.Top,d,d,180,90);p.AddArc(r.Right-d,r.Top,d,d,270,90);p.AddArc(r.Right-d,r.Bottom-d,d,d,0,90);p.AddArc(r.Left,r.Bottom-d,d,d,90,90);p.CloseFigure();return p;}
-    protected override void OnResize(EventArgs e){base.OnResize(e);if(Width<24||Height<24)return;using(var path=Rounded(new Rectangle(0,0,Width,Height),12)){var old=Region;Region=new Region(path);if(old!=null)old.Dispose();}}
-    protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;using(var path=Rounded(new Rectangle(0,0,Width-1,Height-1),12))using(var pen=new Pen(Color.FromArgb(225,228,236)))e.Graphics.DrawPath(pen,path);}
-}
-
+// The settings window, laid out like Windows 11 Settings: navigation on the left, a header with the live
+// preview, then cards of setting rows. All positions are computed from the window size and monitor scale.
 sealed class StudioForm : Form {
-    public readonly HaloSettings Settings;public readonly PreviewPanel Preview;public readonly BrightnessControl Brightness;
-    public bool AllowClose;public Label StateLabel,UpdateStatus;public Button CheckUpdateButton,InstallUpdateButton;public TrackBar ScreenSlider,PointerSlider,BrightnessSlider;public ComboBox StyleBox,ColorMode;
+    public readonly HaloSettings Settings;public PreviewPanel Preview;public BrightnessControl Brightness;
+    public bool AllowClose;public FluentSlider ScreenSlider,PointerSlider,BrightnessSlider;public FluentCombo StyleBox,ColorMode;
+    public FluentButton CheckUpdateButton,InstallUpdateButton;public TextBlock UpdateStatus;
     public event Action Changed,PauseRequested,QuitRequested,CheckUpdatesRequested,InstallUpdateRequested;
-    readonly List<Panel> pages=new List<Panel>();readonly List<Button> navigation=new List<Button>();Panel body,rail;Label pageTitle,pageSubtitle;Button choose;bool loading=true,persist;System.Windows.Forms.Timer saveTimer,brightnessTimer;Label brightnessInfo;
-    static Color Ink=Color.FromArgb(27,31,41),Muted=Color.FromArgb(105,110,124),Background=Color.FromArgb(248,249,252),Blue=Color.FromArgb(38,105,214);
+    public static readonly string[] PageNames={"Accueil","Couleurs","Souris","Écran","Vidéo","Mises à jour"};
+    static readonly string[] PageIcons={"home","colors","mouse","screen","video","update"};
+    static readonly string[] AmbianceNames={"Automatique","Indigo","Améthyste","Néon rose","Lagon","Coucher de soleil"};
+    static readonly Color[] Swatches={Color.FromArgb(75,95,245),Color.FromArgb(160,65,225),Color.FromArgb(230,55,140),Color.FromArgb(0,165,190),Color.FromArgb(20,170,100),Color.FromArgb(245,125,35),
+        Color.FromArgb(235,50,60),Color.FromArgb(250,190,30),Color.FromArgb(130,205,40),Color.FromArgb(40,140,250),Color.FromArgb(255,120,160),Color.FromArgb(240,240,245)};
+    static readonly string[] SwatchNames={"Indigo","Améthyste","Néon rose","Lagon","Forêt","Coucher de soleil","Rubis","Or","Citron vert","Azur","Corail","Blanc doux"};
+    static readonly Color[] Ambiances={Color.Empty,Swatches[0],Swatches[1],Swatches[2],Swatches[3],Swatches[5]};
+    readonly List<PagePanel> pages=new List<PagePanel>();readonly List<NavItem> navigation=new List<NavItem>();readonly List<SettingRow> rows=new List<SettingRow>();
+    readonly List<Action> binders=new List<Action>();readonly List<Bitmap> art=new List<Bitmap>();
+    readonly bool persist;bool loading=true,paused,videoNow;int current;string status,message="Prêt à vérifier les mises à jour.";Color liveColor=Color.RoyalBlue;
+    FluentControl side,hero;SearchBox search;TextBlock title,headline,detail,searchHint;FluentButton pauseLink;NavItem pauseItem,quitItem;InfoTile colorTile,updateTile;
+    SettingRow brightnessRow,detectionRow;Bitmap logo;System.Windows.Forms.Timer saveTimer,brightnessTimer;
     public StudioForm(HaloSettings settings,bool probeBrightness){
-        persist=probeBrightness;Settings=settings;Text="Halo Studio · "+BuildInfo.Version;ClientSize=new Size(1060,700);MinimumSize=new Size(900,620);StartPosition=FormStartPosition.CenterScreen;BackColor=Background;ForeColor=Ink;Font=new Font("Segoe UI",10);AutoScaleMode=AutoScaleMode.Dpi;Icon=Branding.AppIcon();
-        rail=new Panel{Location=new Point(0,0),Size=new Size(190,700),Anchor=AnchorStyles.Left|AnchorStyles.Top|AnchorStyles.Bottom,BackColor=Color.FromArgb(239,240,246)};Controls.Add(rail);
-        var logo=Branding.Logo();if(logo!=null)rail.Controls.Add(new PictureBox{Image=logo,SizeMode=PictureBoxSizeMode.Zoom,Location=new Point(10,14),Size=new Size(46,46)});
-        var brandLabel=LabelAt(rail,"Halo Studio",64,15,true,113,30);brandLabel.Font=new Font("Segoe UI",10,FontStyle.Bold);LabelAt(rail,"Version bêta 4",64,44,false,120,25);
-        string[] names={"Couleurs","Souris","Écran","Mises à jour"};
-        for(int i=0;i<names.Length;i++){int selected=i;var button=ButtonAt(rail,names[i],12,132+i*52,166);button.TextAlign=ContentAlignment.MiddleLeft;button.FlatAppearance.BorderSize=0;using(var pill=new GraphicsPath()){pill.AddArc(0,0,24,24,180,90);pill.AddArc(button.Width-25,0,24,24,270,90);pill.AddArc(button.Width-25,button.Height-25,24,24,0,90);pill.AddArc(0,button.Height-25,24,24,90,90);pill.CloseFigure();button.Region=new Region(pill);}button.Click+=delegate{SelectPage(selected);};navigation.Add(button);}
-        LabelAt(rail,"Local sur ton PC\nWindows 10 / 11",14,480,false,155,50);
-        pageTitle=LabelAt(this,"Couleurs",211,30,true,620,46);pageTitle.Font=new Font("Segoe UI",25,FontStyle.Bold);
-        pageSubtitle=LabelAt(this,"Une ambiance qui suit ton écran.",215,82,false,680,28);
-        body=new Panel{Location=new Point(210,125),Size=new Size(500,500),Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Bottom};Controls.Add(body);
-        Preview=new PreviewPanel{Settings=settings,Location=new Point(730,125),Size=new Size(310,480),Anchor=AnchorStyles.Top|AnchorStyles.Right};Controls.Add(Preview);
-        var colors=Page();var mouse=Page();var display=Page();var updates=Page();
-        var mode=Card(colors,0,142);LabelAt(mode,"Mode de couleur",18,15,true);LabelAt(mode,"Même ambiance pour l’écran et le pointeur.",18,46,false);
-        ColorMode=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Location=new Point(20,84),Size=new Size(445,30),Anchor=AnchorStyles.Left|AnchorStyles.Right|AnchorStyles.Top};ColorMode.Items.AddRange(new object[]{"Automatique · applications et vidéos","Couleur unique"});ColorMode.SelectedIndex=settings.AutoColor?0:1;ReadableCombo(ColorMode);mode.Controls.Add(ColorMode);
-        var palette=Card(colors,153,227);LabelAt(palette,"Ta couleur",18,15,true);choose=ButtonAt(palette,"Choisir une couleur…",20,53,265);choose.BackColor=settings.FixedColor;choose.ForeColor=Color.White;
-        choose.Click+=delegate{using(var dialog=new ColorDialog{Color=settings.FixedColor,FullOpen=true})if(dialog.ShowDialog(this)==DialogResult.OK){settings.ColorArgb=dialog.Color.ToArgb();ColorMode.SelectedIndex=1;Apply();}};
-        Color[] swatches={Color.FromArgb(75,95,245),Color.FromArgb(160,65,225),Color.FromArgb(230,55,140),Color.FromArgb(0,165,190),Color.FromArgb(20,170,100),Color.FromArgb(245,125,35)};
-        for(int i=0;i<swatches.Length;i++){Color c=swatches[i];var b=new Button{BackColor=c,Location=new Point(20+i*55,111),Size=new Size(43,36),FlatStyle=FlatStyle.Flat,AccessibleName="Couleur "+ColorTranslator.ToHtml(c)};b.FlatAppearance.BorderSize=0;b.Click+=delegate{settings.ColorArgb=c.ToArgb();ColorMode.SelectedIndex=1;Apply();};palette.Controls.Add(b);}
-        LabelAt(palette,"Automatique : les couleurs suivent l’image.\nCouleur unique : la teinte choisie reste constante.",18,167,false,430,52);ColorMode.SelectedIndexChanged+=delegate{settings.AutoColor=ColorMode.SelectedIndex==0;Apply();};
-        var pointerOnCard=Card(mouse,0,55);var pointerOn=CheckAt(pointerOnCard,"Activer le pointeur lumineux",18,12,settings.PointerEnabled);pointerOn.CheckedChanged+=delegate{settings.PointerEnabled=pointerOn.Checked;Apply();};
-        var styles=Card(mouse,65,192);LabelAt(styles,"Style du pointeur",18,14,true);StyleBox=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Location=new Point(20,51),Size=new Size(445,30),Anchor=AnchorStyles.Left|AnchorStyles.Right|AnchorStyles.Top};StyleBox.Items.AddRange(PointerArt.Names);StyleBox.SelectedIndex=settings.PointerStyle;ReadableCombo(StyleBox);styles.Controls.Add(StyleBox);StyleBox.SelectedIndexChanged+=delegate{settings.PointerStyle=StyleBox.SelectedIndex;Apply();};
-        for(int i=0;i<PointerArt.Names.Length;i++){int style=i;var tile=new Button{Location=new Point(20+i*53,101),Size=new Size(48,74),FlatStyle=FlatStyle.Flat,BackColor=Color.White,AccessibleName=PointerArt.Names[i],Image=PointerArt.Render(i,settings.FixedColor,90,70)};tile.FlatAppearance.BorderColor=Color.FromArgb(225,228,234);tile.Click+=delegate{StyleBox.SelectedIndex=style;};styles.Controls.Add(tile);}
-        PointerSlider=SliderAt(Card(mouse,267,95),"Intensité du contour lumineux",0,100,settings.PointerIntensity,delegate(int v){settings.PointerIntensity=v;Apply();});
-        SliderAt(Card(mouse,372,95),"Taille du pointeur",80,160,settings.PointerSize,delegate(int v){settings.PointerSize=v;Apply();});
-        var enabled=Card(display,0,55);var screenOn=CheckAt(enabled,"Halo permanent, même hors vidéo",18,12,settings.ScreenEnabled);screenOn.CheckedChanged+=delegate{settings.ScreenEnabled=screenOn.Checked;Apply();};
-        ScreenSlider=SliderAt(Card(display,65,95),"Intensité du halo",0,100,settings.ScreenIntensity,delegate(int v){settings.ScreenIntensity=v;Apply();});
-        SliderAt(Card(display,170,95),"Étendue du halo",50,180,settings.Width,delegate(int v){settings.Width=v;Apply();});
-        var vid=Card(display,275,55);var video=CheckAt(vid,"Vidéo : amplification maximale",18,12,settings.VideoBoost);video.CheckedChanged+=delegate{settings.VideoBoost=video.Checked;Apply();};
-        Brightness=probeBrightness?new BrightnessControl():null;int current=Brightness!=null&&Brightness.Available?Brightness.Current:50;Preview.Brightness=current;
-        var videoOnlyCard=Card(display,340,55);var videoOnly=CheckAt(videoOnlyCard,"Halo automatique pendant les vidéos",18,12,settings.VideoOnly);videoOnly.CheckedChanged+=delegate{settings.VideoOnly=videoOnly.Checked;Apply();};
-        var pc=Card(display,405,135);BrightnessSlider=SliderAt(pc,"Luminosité du PC",0,100,current,delegate(int v){Preview.Brightness=v;Preview.Invalidate();if(!loading&&Brightness!=null&&Brightness.Available){brightnessTimer.Stop();brightnessTimer.Start();}});BrightnessSlider.Enabled=Brightness!=null&&Brightness.Available;brightnessInfo=LabelAt(pc,BrightnessSlider.Enabled?"Luminosité matérielle · Windows":"Écran non compatible : utiliser ses boutons physiques.",18,94,false,445,37);
-        var version=Card(updates,0,135);LabelAt(version,"Halo Studio · canal bêta",18,17,true);LabelAt(version,"Version installée : "+BuildInfo.Version,18,55,false);LabelAt(version,"Les nouveautés arrivent d’abord en version bêta.",18,89,false);
-        var autoCard=Card(updates,145,93);var automatic=CheckAt(autoCard,"Mises à jour automatiques",18,12,settings.AutoUpdates);automatic.CheckedChanged+=delegate{settings.AutoUpdates=automatic.Checked;Apply();};LabelAt(autoCard,"Téléchargées puis installées à la fermeture.",18,51,false);
-        var actions=Card(updates,248,205);UpdateStatus=LabelAt(actions,"Prêt à vérifier les mises à jour.",18,18,false,445,56);CheckUpdateButton=ButtonAt(actions,"Vérifier et télécharger",20,85,280);CheckUpdateButton.Click+=delegate{if(CheckUpdatesRequested!=null)CheckUpdatesRequested();};InstallUpdateButton=ButtonAt(actions,"Installer et relancer",20,139,280);InstallUpdateButton.Enabled=false;InstallUpdateButton.Click+=delegate{if(InstallUpdateRequested!=null)InstallUpdateRequested();};
-        var pause=ButtonAt(this,"Pause / Reprise",210,647,180);pause.Anchor=AnchorStyles.Left|AnchorStyles.Bottom;pause.Click+=delegate{if(PauseRequested!=null)PauseRequested();};var quit=ButtonAt(this,"Quitter Halo",895,647,145);quit.Anchor=AnchorStyles.Right|AnchorStyles.Bottom;quit.Click+=delegate{if(QuitRequested!=null)QuitRequested();};StateLabel=LabelAt(this,"Actif · réglages enregistrés",410,654,false,470,30);StateLabel.Anchor=AnchorStyles.Bottom|AnchorStyles.Left;
-        saveTimer=new System.Windows.Forms.Timer{Interval=350};saveTimer.Tick+=delegate{saveTimer.Stop();try{settings.Save();}catch{StateLabel.Text="Impossible d’enregistrer les réglages.";}};
-        brightnessTimer=new System.Windows.Forms.Timer{Interval=350};brightnessTimer.Tick+=delegate{brightnessTimer.Stop();try{Brightness.Set(BrightnessSlider.Value);brightnessInfo.Text="Luminosité Windows : "+Brightness.Current+" %";}catch(Exception ex){brightnessInfo.Text=ex.Message;}};
-        FormClosing+=delegate(object sender,FormClosingEventArgs e){if(!AllowClose){e.Cancel=true;Hide();}};Resize+=delegate{Responsive();};loading=false;SelectPage(0);Responsive();
+        persist=probeBrightness;Settings=settings;Text="Halo Studio";StartPosition=FormStartPosition.CenterScreen;AutoScaleMode=AutoScaleMode.None;Icon=Branding.AppIcon();
+        SetStyle(ControlStyles.OptimizedDoubleBuffer|ControlStyles.AllPaintingInWmPaint|ControlStyles.ResizeRedraw,true);
+        Theme.Apply(Theme.SystemDark());logo=Branding.Logo();
+        using(var g=CreateGraphics())Theme.Scale=Math.Max(1,g.DpiX/96f);Theme.ResetFonts();
+        ClientSize=new Size(Theme.S(1120),Theme.S(740));MinimumSize=new Size(Theme.S(900),Theme.S(620));
+        saveTimer=new System.Windows.Forms.Timer{Interval=350};saveTimer.Tick+=delegate{saveTimer.Stop();try{Settings.Save();}catch{SetStatus("Impossible d’enregistrer les réglages.");}};
+        brightnessTimer=new System.Windows.Forms.Timer{Interval=350};brightnessTimer.Tick+=delegate{brightnessTimer.Stop();if(Brightness==null||!Brightness.Available)return;try{Brightness.Set(BrightnessSlider.Value);brightnessRow.Description="Luminosité matérielle · Windows";}catch(Exception ex){brightnessRow.Description=ex.Message;}brightnessRow.Invalidate();};
+        Build();
+        if(probeBrightness){
+            // The hardware query can take a second: it must not delay the window.
+            System.Threading.Tasks.Task.Factory.StartNew(delegate{return new BrightnessControl();}).ContinueWith(delegate(System.Threading.Tasks.Task<BrightnessControl> done){
+                try{if(!IsDisposed&&IsHandleCreated)BeginInvoke((Action)delegate{Brightness=done.Result;ShowBrightness();});}catch{}
+            });
+            try{Microsoft.Win32.SystemEvents.UserPreferenceChanged+=ThemeChanged;}catch{}
+        }
+        FormClosing+=delegate(object sender,FormClosingEventArgs e){if(!AllowClose){e.Cancel=true;Hide();}};
     }
-    void Responsive(){if(body==null||Preview==null)return;int previewWidth=ClientSize.Width<980?260:310;Preview.Width=previewWidth;Preview.Height=Math.Min(480,ClientSize.Height-210);Preview.Left=ClientSize.Width-previewWidth-20;body.Width=Math.Max(345,Preview.Left-body.Left-20);body.Height=Math.Max(360,ClientSize.Height-194);foreach(var page in pages)foreach(Control c in page.Controls)if(c is SettingsCard)c.Width=body.Width-10;}
-    public void SelectPage(int index){for(int i=0;i<pages.Count;i++){pages[i].Visible=i==index;navigation[i].BackColor=i==index?Color.White:rail.BackColor;navigation[i].ForeColor=i==index?Blue:Ink;}pageTitle.Text=navigation[index].Text;string[] descriptions={"Une ambiance qui suit ton écran.","Un contour lumineux attaché à ton pointeur.","Ajuste la lumière, sur portable comme sur PC.","Les nouveautés de Halo Studio, simplement."};pageSubtitle.Text=descriptions[index];}
-    Panel Page(){var p=new Panel{Dock=DockStyle.Fill,AutoScroll=true,BackColor=Background};pages.Add(p);body.Controls.Add(p);return p;}
-    SettingsCard Card(Control page,int y,int height){var c=new SettingsCard{Location=new Point(0,y),Size=new Size(body.Width-10,height),Anchor=AnchorStyles.Left|AnchorStyles.Right|AnchorStyles.Top};page.Controls.Add(c);return c;}
-    Label LabelAt(Control host,string text,int x,int y,bool bold,int width=445,int height=30){var l=new Label{Text=text,Location=new Point(x,y),Size=new Size(width,height),ForeColor=bold?Ink:Muted,BackColor=Color.Transparent,Font=new Font("Segoe UI",bold?11:9.5f,bold?FontStyle.Bold:FontStyle.Regular)};host.Controls.Add(l);return l;}
-    Button ButtonAt(Control host,string text,int x,int y,int width){var b=new Button{Text=text,Location=new Point(x,y),Size=new Size(width,38),FlatStyle=FlatStyle.Flat,BackColor=Color.White,ForeColor=Ink};b.FlatAppearance.BorderColor=Color.FromArgb(214,218,223);host.Controls.Add(b);return b;}
-    CheckBox CheckAt(Control host,string text,int x,int y,bool value){var c=new CheckBox{Text=text,Checked=value,Location=new Point(x,y),Size=new Size(445,30),Anchor=AnchorStyles.Left|AnchorStyles.Right|AnchorStyles.Top};host.Controls.Add(c);return c;}
-    TrackBar SliderAt(Control host,string text,int min,int max,int value,Action<int> change){LabelAt(host,text,18,12,true,335);var number=LabelAt(host,value+" %",host.Width-75,12,false,65);number.Anchor=AnchorStyles.Top|AnchorStyles.Right;var t=new TrackBar{Minimum=min,Maximum=max,Value=value,TickStyle=TickStyle.None,Location=new Point(15,47),Size=new Size(host.Width-35,40),Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right,AccessibleName=text};t.ValueChanged+=delegate{number.Text=t.Value+" %";change(t.Value);};host.Controls.Add(t);return t;}
-    void ReadableCombo(ComboBox combo){combo.DrawMode=DrawMode.OwnerDrawFixed;combo.ItemHeight=25;combo.DrawItem+=delegate(object sender,DrawItemEventArgs e){e.DrawBackground();int index=e.Index<0?combo.SelectedIndex:e.Index;if(index>=0)TextRenderer.DrawText(e.Graphics,combo.Items[index].ToString(),combo.Font,e.Bounds,Ink,TextFormatFlags.VerticalCenter|TextFormatFlags.Left);e.DrawFocusRectangle();};
-        Label selected=null;Action refresh=delegate{if(selected!=null){selected.Text=combo.SelectedItem==null?"":combo.SelectedItem.ToString();selected.Bounds=new Rectangle(combo.Left+6,combo.Top+3,Math.Max(5,combo.Width-32),combo.Height-6);selected.BringToFront();}};
-        combo.ParentChanged+=delegate{if(combo.Parent!=null&&selected==null){selected=new Label{AutoEllipsis=true,BackColor=Color.White,ForeColor=Ink,TextAlign=ContentAlignment.MiddleLeft,Font=combo.Font};selected.Click+=delegate{combo.Focus();combo.DroppedDown=true;};combo.Parent.Controls.Add(selected);refresh();}};combo.SelectedIndexChanged+=delegate{refresh();};combo.SizeChanged+=delegate{refresh();};
+    void ThemeChanged(object sender,Microsoft.Win32.UserPreferenceChangedEventArgs e){
+        if(e.Category!=Microsoft.Win32.UserPreferenceCategory.General||IsDisposed||!IsHandleCreated)return;
+        BeginInvoke((Action)delegate{bool dark=Theme.SystemDark();if(dark==Theme.Dark)return;Theme.Apply(dark);search.Restyle();Chrome();Invalidate(true);});
     }
-    void Apply(){if(loading)return;Settings.Normalize();choose.BackColor=Settings.FixedColor;Preview.Invalidate();if(persist){saveTimer.Stop();saveTimer.Start();}if(Changed!=null)Changed();}
-    public void Live(Color color,bool paused,Bitmap frame=null,bool videoDetected=false){Preview.VideoDetected=videoDetected;Preview.RefreshState(color,paused);if(frame!=null&&Preview.Visible)Preview.SetFrame(frame);string text=paused?"En pause · pointeur restauré":Settings.AutoColor?"Actif · couleurs synchronisées":"Actif · couleur unique";if(StateLabel.Text!=text)StateLabel.Text=text;}
-    protected override void Dispose(bool disposing){if(disposing){if(saveTimer!=null)saveTimer.Dispose();if(brightnessTimer!=null)brightnessTimer.Dispose();foreach(var page in pages)foreach(Control card in page.Controls)foreach(Control child in card.Controls)if(child is Button&&((Button)child).Image!=null)((Button)child).Image.Dispose();}base.Dispose(disposing);}
+    // Title bar in the color of the backdrop and dark caption buttons when needed (Windows 11; ignored elsewhere).
+    void Chrome(){
+        try{
+            int dark=Theme.Dark?1:0;Native.DwmSetWindowAttribute(Handle,20,ref dark,4);
+            Color top=Theme.BackdropTop();int caption=top.R|(top.G<<8)|(top.B<<16);Native.DwmSetWindowAttribute(Handle,35,ref caption,4);
+        }catch{}
+    }
+    protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);Chrome();}
+    protected override void OnPaintBackground(PaintEventArgs e){Theme.PaintBackdrop(e.Graphics,ClientRectangle);}
+    protected override void OnResize(EventArgs e){base.OnResize(e);Arrange();}
+    protected override void WndProc(ref Message m){
+        // Moving to a monitor with another scale: take the size Windows suggests and rebuild at the new scale.
+        if(m.Msg==0x02E0&&side!=null){
+            float scale=Math.Max(1,(m.WParam.ToInt32()>>16&0xffff)/96f);
+            if(Math.Abs(scale-Theme.Scale)>.01f){
+                var r=(Native.RECT)System.Runtime.InteropServices.Marshal.PtrToStructure(m.LParam,typeof(Native.RECT));Theme.Scale=scale;Theme.ResetFonts();
+                MinimumSize=Size.Empty;Bounds=Rectangle.FromLTRB(r.Left,r.Top,r.Right,r.Bottom);MinimumSize=new Size(Theme.S(900),Theme.S(620));Build();
+            }
+        }
+        base.WndProc(ref m);
+    }
+
+    SettingRow Row(Card card,int page,string icon,string name,string description,Control action=null,string keywords=null){
+        var row=card.Add(new SettingRow(icon,name,description,action){Page=page,Keywords=keywords});rows.Add(row);return row;
+    }
+    ToggleSwitch Toggle(Card card,int page,string icon,string name,string description,Func<bool> read,Action<bool> write,string keywords=null){
+        var toggle=new ToggleSwitch{Checked=read()};var row=Row(card,page,icon,name,description,toggle,keywords);
+        Action show=delegate{toggle.Checked=read();string label=toggle.Checked?"Activé":"Désactivé";if(row.Value!=label){row.Value=label;row.Invalidate();}};
+        toggle.CheckedChanged+=delegate{if(loading)return;write(toggle.Checked);Apply();};binders.Add(show);show();return toggle;
+    }
+    FluentSlider Slider(Card card,int page,string icon,string name,string description,int min,int max,Func<int> read,Action<int> write,string keywords=null){
+        var slider=new FluentSlider{Minimum=min,Maximum=max,Value=read()};var row=Row(card,page,icon,name,description,slider,keywords);
+        Action show=delegate{string label=slider.Value+" %";if(row.Value!=label){row.Value=label;row.Invalidate();}};
+        slider.ValueChanged+=delegate{show();if(loading)return;write(slider.Value);Apply();};binders.Add(delegate{slider.Value=read();show();});show();return slider;
+    }
+    PagePanel Page(){var p=new PagePanel{Visible=false};pages.Add(p);Controls.Add(p);return p;}
+    int AmbianceIndex(){if(Settings.AutoColor)return 0;for(int i=1;i<Ambiances.Length;i++)if(Ambiances[i].ToArgb()==Settings.FixedColor.ToArgb())return i;return -1;}
+    int SwatchIndex(){if(Settings.AutoColor)return -1;for(int i=0;i<Swatches.Length;i++)if(Swatches[i].ToArgb()==Settings.FixedColor.ToArgb())return i;return -1;}
+
+    void Build(){
+        loading=true;SuspendLayout();
+        foreach(Control c in new List<Control>(System.Linq.Enumerable.Cast<Control>(Controls)))c.Dispose();
+        Controls.Clear();pages.Clear();navigation.Clear();rows.Clear();binders.Clear();foreach(var b in art)b.Dispose();art.Clear();
+        var s=Settings;
+
+        side=new FluentControl();Controls.Add(side);
+        side.Paint+=delegate(object sender,PaintEventArgs e){
+            int mark=Theme.S(46);
+            if(logo!=null){e.Graphics.InterpolationMode=InterpolationMode.HighQualityBicubic;e.Graphics.DrawImage(logo,new Rectangle(Theme.S(18),Theme.S(16),mark,mark));}
+            TextRenderer.DrawText(e.Graphics,"Halo Studio",Theme.Font(14,true),new Rectangle(Theme.S(76),Theme.S(18),side.Width-Theme.S(80),Theme.S(22)),Theme.Text,TextFormatFlags.VerticalCenter|TextFormatFlags.NoPadding|TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(e.Graphics,"Version "+BuildInfo.Version.Replace("-beta."," · bêta "),Theme.Font(12),new Rectangle(Theme.S(76),Theme.S(40),side.Width-Theme.S(80),Theme.S(20)),Theme.Muted,TextFormatFlags.VerticalCenter|TextFormatFlags.NoPadding|TextFormatFlags.EndEllipsis);
+        };
+        search=new SearchBox("Rechercher un réglage");side.Controls.Add(search);search.Input.TextChanged+=delegate{Search(search.Input.Text);};
+        searchHint=new TextBlock("",12,false,true){Visible=false};side.Controls.Add(searchHint);
+        for(int i=0;i<PageNames.Length;i++){int index=i;var item=new NavItem(PageNames[i],PageIcons[i]);item.Click+=delegate{SelectPage(index);};navigation.Add(item);side.Controls.Add(item);}
+        pauseItem=new NavItem("Mettre en pause","pause"){Tinted=false};pauseItem.Click+=delegate{if(PauseRequested!=null)PauseRequested();};side.Controls.Add(pauseItem);
+        quitItem=new NavItem("Quitter Halo","power"){Tinted=false};quitItem.Click+=delegate{if(QuitRequested!=null)QuitRequested();};side.Controls.Add(quitItem);
+
+        title=new TextBlock(PageNames[0],28,true){Height=Theme.S(40)};Controls.Add(title);
+        hero=new FluentControl();Controls.Add(hero);
+        Preview=new PreviewPanel{Settings=s,LiveColor=liveColor,Paused=paused,VideoDetected=videoNow};hero.Controls.Add(Preview);
+        headline=new TextBlock("Halo actif",20,true){Height=Theme.S(28)};hero.Controls.Add(headline);
+        detail=new TextBlock("",14,false,true){Height=Theme.S(22)};hero.Controls.Add(detail);
+        pauseLink=new FluentButton("Mettre en pause"){Link=true};pauseLink.Click+=delegate{if(PauseRequested!=null)PauseRequested();};hero.Controls.Add(pauseLink);
+        colorTile=new InfoTile("colors","Couleur");colorTile.Click+=delegate{SelectPage(1);};hero.Controls.Add(colorTile);
+        updateTile=new InfoTile("update","Mises à jour");updateTile.Click+=delegate{SelectPage(5);};hero.Controls.Add(updateTile);
+
+        // Accueil
+        var home=Page();
+        var recommended=home.Add(new Card("Réglages recommandés","Les réglages les plus utilisés"),0);
+        Toggle(recommended,0,"video","Halo vidéo","S’allume tout seul quand une vidéo est à l’écran",delegate{return s.VideoOnly;},delegate(bool v){s.VideoOnly=v;});
+        Toggle(recommended,0,"mouse","Pointeur lumineux","Un contour de lumière autour du pointeur",delegate{return s.PointerEnabled;},delegate(bool v){s.PointerEnabled=v;});
+        var modeLink=Row(recommended,0,"colors","Mode de couleur",null);modeLink.AsLink();modeLink.Click+=delegate{SelectPage(1);};
+        binders.Add(delegate{string label=s.AutoColor?"Automatique":"Couleur unique";if(modeLink.Value!=label){modeLink.Value=label;modeLink.Invalidate();}});
+        var shortcuts=home.Add(new Card(),0);
+        Row(shortcuts,0,"keyboard","Pause ou reprise","Depuis n’importe quelle application",null,"raccourci clavier").Value="Ctrl + Alt + Maj + H";
+        Row(shortcuts,0,"power","Quitter Halo","Arrête les effets et restaure le pointeur",null,"raccourci clavier fermer").Value="Ctrl + Alt + Maj + Q";
+        var cinema=home.Add(new Card("Mode cinéma"),1);
+        cinema.Add(new TextBlock("Pendant une vidéo, le halo s’élargit, gagne en intensité et suit les couleurs de l’image au plus près, barres noires exclues. Le reste du temps, il reste discret.",14,false,true){AutoHeight=true});
+        var cinemaButton=cinema.Add(new FluentButton("Activer le mode cinéma",true));
+        cinemaButton.Click+=delegate{s.VideoBoost=!s.VideoBoost;if(s.VideoBoost)s.VideoOnly=true;Apply();};
+        binders.Add(delegate{string label=s.VideoBoost?"Désactiver le mode cinéma":"Activer le mode cinéma";if(cinemaButton.Text!=label){cinemaButton.Primary=!s.VideoBoost;cinemaButton.Text=label;cinemaButton.AccessibleName=label;cinemaButton.AutoWidth();}});
+        var personal=home.Add(new Card("Personnalisez votre halo"),1);
+        var ambiance=personal.Add(new TileStrip{Count=Ambiances.Length,Columns=3,Names=AmbianceNames,AccessibleName="Ambiances",Painter=PaintAmbiance});
+        ambiance.Picked+=delegate(int i){if(i==0)s.AutoColor=true;else{s.AutoColor=false;s.ColorArgb=Ambiances[i].ToArgb();}Apply();};
+        binders.Add(delegate{ambiance.SelectedIndex=AmbianceIndex();});
+
+        // Couleurs
+        var colors=Page();var modeCard=colors.Add(new Card());
+        ColorMode=new FluentCombo();ColorMode.Items.Add("Automatique · applications et vidéos");ColorMode.Items.Add("Couleur unique");ColorMode.SelectedIndex=s.AutoColor?0:1;
+        Row(modeCard,1,"colors","Mode de couleur","La même ambiance pour l’écran et le pointeur",ColorMode,"automatique teinte synchronisation");
+        ColorMode.SelectedIndexChanged+=delegate{if(loading)return;s.AutoColor=ColorMode.SelectedIndex==0;Apply();};binders.Add(delegate{ColorMode.SelectedIndex=s.AutoColor?0:1;});
+        var palette=colors.Add(new Card("Ta couleur","Choisir une teinte passe en couleur unique"));
+        var swatches=palette.Add(new TileStrip{Count=Swatches.Length,TileWidth=Theme.S(54),TileHeight=Theme.S(42),Names=SwatchNames,AccessibleName="Couleurs proposées",Painter=delegate(Graphics g,Rectangle r,int i){Theme.Fill(g,Rectangle.Inflate(r,-Theme.S(5),-Theme.S(5)),Theme.S(4),Swatches[i],Color.Empty);}});
+        swatches.Picked+=delegate(int i){s.AutoColor=false;s.ColorArgb=Swatches[i].ToArgb();Apply();};binders.Add(delegate{swatches.SelectedIndex=SwatchIndex();});
+        var choose=palette.Add(new FluentButton("Autre couleur…"));
+        choose.Click+=delegate{using(var dialog=new ColorDialog{Color=s.FixedColor,FullOpen=true})if(dialog.ShowDialog(this)==DialogResult.OK){s.ColorArgb=dialog.Color.ToArgb();s.AutoColor=false;Apply();}};
+
+        // Souris
+        var mouse=Page();var pointerCard=mouse.Add(new Card());
+        Toggle(pointerCard,2,"mouse","Pointeur lumineux","Flèche, main et curseur de texte prennent le thème choisi",delegate{return s.PointerEnabled;},delegate(bool v){s.PointerEnabled=v;},"curseur souris");
+        StyleBox=new FluentCombo();StyleBox.Items.AddRange(PointerArt.Names);StyleBox.SelectedIndex=s.PointerStyle;
+        Row(pointerCard,2,"glow","Style du pointeur",null,StyleBox,"forme flèche diamant croix chevron");
+        StyleBox.SelectedIndexChanged+=delegate{if(loading)return;s.PointerStyle=StyleBox.SelectedIndex;Apply();};binders.Add(delegate{StyleBox.SelectedIndex=s.PointerStyle;});
+        for(int i=0;i<PointerArt.Names.Length;i++)art.Add(PointerArt.Render(i,Swatches[0],90,70));
+        var styles=pointerCard.Add(new TileStrip{Count=PointerArt.Names.Length,Names=PointerArt.Names,AccessibleName="Styles de pointeur",Painter=delegate(Graphics g,Rectangle r,int i){Bitmap b=art[i];g.DrawImageUnscaled(b,r.X+(r.Width-b.Width)/2-Theme.S(3),r.Y+(r.Height-b.Height)/2-Theme.S(2));}});
+        styles.Picked+=delegate(int i){StyleBox.SelectedIndex=i;};binders.Add(delegate{styles.SelectedIndex=s.PointerStyle;});
+        var pointerSliders=mouse.Add(new Card());
+        var family=mouse.Add(new Card("Tous les pointeurs","Chaque pointeur de Windows reçoit le thème : lien, texte, attente, aide, redimensionnement, déplacement, stylet…"));
+        var roleStrip=family.Add(new TileStrip{Count=PointerArt.Roles.Length,Names=PointerArt.Roles,AccessibleName="Pointeurs thémés",TabStop=false,Painter=delegate(Graphics g,Rectangle r,int i){
+            using(var b=PointerArt.Render(s.PointerStyle,s.AutoColor?liveColor:s.FixedColor,s.PointerIntensity,80,i)){Point hot=PointerArt.RoleHotspot(s.PointerStyle,80,i);bool arrow=i==0||i==4||i==6;g.DrawImageUnscaled(b,r.X+r.Width/2-(arrow?hot.X+Theme.S(9):b.Width*47/100),r.Y+r.Height/2-(arrow?hot.Y+Theme.S(11):b.Height*46/100));}}});
+        binders.Add(delegate{roleStrip.Invalidate();});
+        PointerSlider=Slider(pointerSliders,2,"sun","Intensité du contour lumineux",null,0,100,delegate{return s.PointerIntensity;},delegate(int v){s.PointerIntensity=v;},"lueur souris");
+        Slider(pointerSliders,2,"size","Taille du pointeur",null,80,160,delegate{return s.PointerSize;},delegate(int v){s.PointerSize=v;},"grand petit souris");
+
+        // Écran
+        var display=Page();var glow=display.Add(new Card());
+        Toggle(glow,3,"screen","Halo permanent","Visible même sans vidéo, aux couleurs de l’application active",delegate{return s.ScreenEnabled;},delegate(bool v){s.ScreenEnabled=v;},"toujours bords lumière");
+        ScreenSlider=Slider(glow,3,"sun","Intensité du halo",null,0,100,delegate{return s.ScreenIntensity;},delegate(int v){s.ScreenIntensity=v;},"force lumière");
+        Slider(glow,3,"size","Étendue du halo","Largeur de la lumière sur les bords",50,180,delegate{return s.Width;},delegate(int v){s.Width=v;},"largeur taille");
+        var panel=display.Add(new Card());
+        BrightnessSlider=new FluentSlider{Minimum=0,Maximum=100,Value=100,Enabled=false};
+        brightnessRow=Row(panel,3,"sun","Luminosité du PC","Recherche de l’écran…",BrightnessSlider,"écran matériel portable");brightnessRow.Value="";
+        BrightnessSlider.ValueChanged+=delegate{Preview.Brightness=BrightnessSlider.Value;Preview.Invalidate();brightnessRow.Value=BrightnessSlider.Value+" %";brightnessRow.Invalidate();if(!loading&&Brightness!=null&&Brightness.Available){brightnessTimer.Stop();brightnessTimer.Start();}};
+        ShowBrightness();
+
+        // Vidéo
+        var video=Page();var videoCard=video.Add(new Card());
+        Toggle(videoCard,4,"video","Halo vidéo","S’allume quand une vidéo est détectée, s’éteint ensuite",delegate{return s.VideoOnly;},delegate(bool v){s.VideoOnly=v;},"film youtube automatique");
+        Toggle(videoCard,4,"cinema","Mode cinéma","Halo plus large et plus intense pendant les vidéos",delegate{return s.VideoBoost;},delegate(bool v){s.VideoBoost=v;},"film amplification plein écran");
+        detectionRow=Row(videoCard,4,"info","Détection","Aucune vidéo à l’écran pour l’instant",null,"état");
+        var about=video.Add(new Card());
+        about.Add(new TextBlock("Halo repère la zone de l’écran qui bouge comme une vidéo et lit ses couleurs bord par bord, sans les barres noires. En plein écran, il réagit immédiatement. Faire défiler une page ne l’allume pas. Les vidéos protégées et certains jeux en plein écran exclusif ne peuvent pas être lus.",14,false,true){AutoHeight=true});
+
+        // Mises à jour
+        var updates=Page();var version=updates.Add(new Card());
+        Row(version,5,"info","Halo Studio · canal bêta","Les nouveautés arrivent d’abord en version bêta",null,"version").Value=BuildInfo.Version;
+        Toggle(version,5,"update","Mises à jour automatiques","Téléchargées, puis installées à la fermeture",delegate{return s.AutoUpdates;},delegate(bool v){s.AutoUpdates=v;});
+        var actions=updates.Add(new Card());
+        UpdateStatus=actions.Add(new TextBlock(message,14,false,true){AutoHeight=true});
+        CheckUpdateButton=actions.Add(new FluentButton("Vérifier et télécharger",true));CheckUpdateButton.Click+=delegate{if(CheckUpdatesRequested!=null)CheckUpdatesRequested();};
+        InstallUpdateButton=actions.Add(new FluentButton("Installer et relancer"){Enabled=false});InstallUpdateButton.Click+=delegate{if(InstallUpdateRequested!=null)InstallUpdateRequested();};
+
+        ResumeLayout(false);foreach(var bind in binders)bind();loading=false;
+        Arrange();SelectPage(Math.Min(current,pages.Count-1));ShowState();
+    }
+    void PaintAmbiance(Graphics g,Rectangle r,int i){
+        Rectangle inner=Rectangle.Inflate(r,-Theme.S(5),-Theme.S(5));if(inner.Width<8||inner.Height<8)return;
+        g.SmoothingMode=SmoothingMode.AntiAlias;
+        using(var path=Theme.Round(inner,Theme.S(4))){
+            if(i==0)using(var brush=new LinearGradientBrush(inner,Color.Black,Color.Black,20f)){brush.InterpolationColors=new ColorBlend{Colors=new[]{Swatches[3],Swatches[0],Swatches[2],Swatches[5]},Positions=new[]{0f,.36f,.7f,1f}};g.FillPath(brush,path);}
+            else using(var brush=new LinearGradientBrush(inner,Colors.Mix(Ambiances[i],Color.White,.25),Colors.Mix(Ambiances[i],Color.Black,.3),60f))g.FillPath(brush,path);
+        }
+        // A small dark screen in the middle: the tile reads as "this light around your display".
+        Rectangle screen=new Rectangle(inner.X+inner.Width*9/100,inner.Y+inner.Height*26/100,inner.Width*82/100,inner.Height*48/100);
+        Theme.Fill(g,screen,Theme.S(3),Color.FromArgb(232,20,22,28),Color.Empty);
+        TextRenderer.DrawText(g,AmbianceNames[i],Theme.Font(11),screen,Color.White,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPadding);
+    }
+    void ShowBrightness(){
+        if(BrightnessSlider==null)return;bool available=Brightness!=null&&Brightness.Available,was=loading;loading=true;
+        BrightnessSlider.Enabled=available;if(available)BrightnessSlider.Value=Brightness.Current;
+        brightnessRow.Description=available?"Luminosité matérielle · Windows":Brightness==null?(persist?"Recherche de l’écran…":"Non mesurée"):"Écran non compatible : utiliser ses boutons physiques";
+        brightnessRow.Value=available?BrightnessSlider.Value+" %":"";brightnessRow.Invalidate();loading=was;
+    }
+
+    void Arrange(){
+        if(side==null||ClientSize.Width<50)return;
+        int w=ClientSize.Width,h=ClientSize.Height,rail=Theme.S(w>=Theme.S(1040)?280:236),pad=Theme.S(12);
+        side.SetBounds(0,0,rail,h);search.SetBounds(pad+Theme.S(4),Theme.S(78),rail-2*pad-Theme.S(8),search.Height);
+        searchHint.SetBounds(pad+Theme.S(8),search.Bottom+Theme.S(4),rail-2*pad-Theme.S(16),Theme.S(18));
+        int y=search.Bottom+Theme.S(26);foreach(var item in navigation){item.SetBounds(pad,y,rail-2*pad,item.Height);y+=item.Height+Theme.S(4);}
+        quitItem.SetBounds(pad,h-pad-quitItem.Height,rail-2*pad,quitItem.Height);pauseItem.SetBounds(pad,quitItem.Top-Theme.S(4)-pauseItem.Height,rail-2*pad,pauseItem.Height);
+        int x=rail+Theme.S(28),width=Math.Min(Theme.S(1040),w-x-Theme.S(24));
+        title.SetBounds(x,Theme.S(18),width,Theme.S(40));
+        int heroTop=Theme.S(72),heroHeight=Theme.S(112);hero.SetBounds(x,heroTop,width,heroHeight);
+        Preview.SetBounds(0,Theme.S(1),Theme.S(176),Theme.S(110));
+        // Status tiles on the right only when the header is wide enough to keep the text readable.
+        int tiles=width>=Theme.S(840)?2:width>=Theme.S(610)?1:0,tileWidth=colorTile.Width,textLeft=Preview.Right+Theme.S(20),textWidth=Math.Max(Theme.S(120),width-textLeft-tiles*(tileWidth+Theme.S(8)));
+        headline.SetBounds(textLeft,Theme.S(14),textWidth,Theme.S(28));detail.SetBounds(textLeft,Theme.S(44),textWidth,Theme.S(22));pauseLink.Location=new Point(textLeft,Theme.S(68));
+        updateTile.Visible=tiles>=1;colorTile.Visible=tiles>=2;
+        updateTile.Location=new Point(width-tileWidth,Theme.S(22));colorTile.Location=new Point(width-2*tileWidth-Theme.S(8),Theme.S(22));
+        int top=hero.Bottom+Theme.S(16);foreach(var page in pages)page.SetBounds(x,top,w-x-Theme.S(8),Math.Max(Theme.S(80),h-top-Theme.S(8)));
+    }
+    public void SelectPage(int index){
+        current=index;for(int i=0;i<pages.Count;i++){pages[i].Visible=i==index;if(navigation[i].Selected!=(i==index)){navigation[i].Selected=i==index;navigation[i].Invalidate();}}
+        title.Text=PageNames[index];
+    }
+    void Search(string text){
+        string query=Theme.Plain(text).Trim();
+        if(query.Length<2){searchHint.Visible=false;return;}
+        var found=rows.FindAll(delegate(SettingRow r){return r.Matches(query);});
+        searchHint.Text=found.Count==0?"Aucun réglage trouvé":found.Count==1?"1 réglage · "+PageNames[found[0].Page]:found.Count+" réglages · "+PageNames[found[0].Page];searchHint.Visible=true;
+        if(found.Count==0)return;
+        SelectPage(found[0].Page);pages[found[0].Page].ScrollControlIntoView(found[0]);
+        foreach(var row in found)if(row.Page==found[0].Page)row.Flash();
+    }
+    void Apply(){
+        if(loading)return;Settings.Normalize();loading=true;try{foreach(var bind in binders)bind();}finally{loading=false;}
+        Preview.Invalidate();ShowState();if(persist){saveTimer.Stop();saveTimer.Start();}if(Changed!=null)Changed();
+    }
+    void ShowState(){
+        if(headline==null)return;
+        string head=paused?"Halo en pause":videoNow?"Vidéo détectée":"Halo actif";
+        string line=status??(paused?"Pointeur d’origine restauré":videoNow?"Le halo suit les couleurs de l’image":Settings.AutoColor?"Couleurs synchronisées avec l’écran":"Couleur unique");
+        if(headline.Text!=head)headline.Text=head;if(detail.Text!=line)detail.Text=line;
+        string action=paused?"Reprendre":"Mettre en pause";
+        if(pauseLink.Text!=action){pauseLink.Text=action;pauseLink.AccessibleName=action;pauseLink.AutoWidth();pauseItem.Text=action;pauseItem.Icon=paused?"play":"pause";pauseItem.AccessibleName=action;}
+        Color shown=Settings.AutoColor?liveColor:Settings.FixedColor;
+        colorTile.Set((Settings.AutoColor?"Automatique · ":"Unique · ")+ColorTranslator.ToHtml(Color.FromArgb(shown.R,shown.G,shown.B)),shown);updateTile.Set(message);
+        string seen=videoNow?"Vidéo à l’écran : le halo la suit":"Aucune vidéo à l’écran pour l’instant";
+        if(detectionRow.Description!=seen){detectionRow.Description=seen;detectionRow.Value=videoNow?"Active":"";detectionRow.Invalidate();}
+    }
+    public bool PreviewVisible {get{return Visible&&WindowState!=FormWindowState.Minimized;}}
+    public void SetStatus(string text){status=text;ShowState();}
+    public void SetUpdate(string text,bool busy,bool pending){
+        if(text!=message){message=text;UpdateStatus.Text=text;ShowState();}
+        if(CheckUpdateButton.Enabled==busy)CheckUpdateButton.Enabled=!busy;if(InstallUpdateButton.Enabled!=pending){InstallUpdateButton.Enabled=pending;InstallUpdateButton.Primary=pending;InstallUpdateButton.Invalidate();}
+    }
+    public void Live(Color color,bool nowPaused,int[] frame=null,bool videoDetected=false){
+        bool changed=color.ToArgb()!=liveColor.ToArgb()||paused!=nowPaused||videoNow!=videoDetected;
+        liveColor=color;paused=nowPaused;videoNow=videoDetected;
+        if(Preview.VideoDetected!=videoDetected){Preview.VideoDetected=videoDetected;Preview.Invalidate();}
+        Preview.RefreshState(color,nowPaused);if(frame!=null&&PreviewVisible)Preview.SetFrame(frame);
+        if(changed)ShowState();
+    }
+    protected override void Dispose(bool disposing){
+        if(disposing){
+            try{Microsoft.Win32.SystemEvents.UserPreferenceChanged-=ThemeChanged;}catch{}
+            if(saveTimer!=null)saveTimer.Dispose();if(brightnessTimer!=null)brightnessTimer.Dispose();foreach(var b in art)b.Dispose();art.Clear();if(logo!=null)logo.Dispose();
+        }
+        base.Dispose(disposing);
+    }
 }
 
 sealed class HaloApp : ApplicationContext {
     readonly HaloSettings settings;readonly PointerTheme pointer;readonly NotifyIcon tray;readonly Hotkeys keys;readonly StudioForm studio;readonly EventWaitHandle stop;readonly EventWaitHandle show=new EventWaitHandle(false,EventResetMode.AutoReset,"Local\\HaloStudioShow");
-    readonly List<MonitorGlow> monitors=new List<MonitorGlow>();readonly System.Windows.Forms.Timer timer;readonly System.Windows.Forms.Timer updateTimer;readonly AppUpdater updater=new AppUpdater();bool paused,closing,suppressUpdate;string topology="";DateTime lastError=DateTime.MinValue;
+    readonly HaloEngine engine=new HaloEngine();readonly System.Windows.Forms.Timer timer;readonly System.Windows.Forms.Timer updateTimer;readonly AppUpdater updater=new AppUpdater();bool paused,closing,suppressUpdate;int[] shown;
     public HaloApp(EventWaitHandle exitEvent){
-        stop=exitEvent;settings=HaloSettings.Load();pointer=new PointerTheme();pointer.Configure(settings.PointerStyle,settings.FixedColor,settings.PointerIntensity,settings.PointerSize,true);pointer.SetEnabled(settings.PointerEnabled);
+        // The halo starts first: it is already following the screen while the window is being built.
+        stop=exitEvent;settings=HaloSettings.Load();Configure();engine.Start();
+        pointer=new PointerTheme();pointer.Configure(settings.PointerStyle,settings.FixedColor,settings.PointerIntensity,settings.PointerSize,true);pointer.SetEnabled(settings.PointerEnabled);
         studio=new StudioForm(settings,true);studio.Changed+=Apply;studio.PauseRequested+=Toggle;studio.QuitRequested+=ExitThread;
         studio.CheckUpdatesRequested+=async delegate{await updater.Check(true);RefreshUpdates();};
-        studio.InstallUpdateRequested+=delegate{try{if(updater.LaunchPending(true)){suppressUpdate=true;ExitThread();}}catch(Exception ex){studio.UpdateStatus.Text=ex.Message;}};
-        var menu=new ContextMenuStrip();menu.Items.Add("Ouvrir Halo Studio",null,delegate{studio.Show();Native.ShowWindow(studio.Handle,5);studio.Activate();});menu.Items.Add("Pause / Reprise",null,delegate{Toggle();});menu.Items.Add("Quitter et restaurer le pointeur",null,delegate{ExitThread();});
-        tray=new NotifyIcon{Visible=true,Icon=Branding.AppIcon(),Text="Halo Studio · couleurs et pointeur",ContextMenuStrip=menu};tray.DoubleClick+=delegate{studio.Show();Native.ShowWindow(studio.Handle,5);studio.Activate();};
+        studio.InstallUpdateRequested+=delegate{try{if(updater.LaunchPending(true)){suppressUpdate=true;ExitThread();}}catch(Exception ex){studio.SetStatus(ex.Message);}};
+        var menu=new ContextMenuStrip();menu.Items.Add("Ouvrir Halo Studio",null,delegate{Open();});menu.Items.Add("Pause / Reprise",null,delegate{Toggle();});menu.Items.Add("Quitter et restaurer le pointeur",null,delegate{ExitThread();});
+        tray=new NotifyIcon{Visible=true,Icon=Branding.AppIcon(),Text="Halo Studio · couleurs et pointeur",ContextMenuStrip=menu};tray.DoubleClick+=delegate{Open();};
         keys=new Hotkeys(delegate(int id){if(id==1)Toggle();else ExitThread();});
-        timer=new System.Windows.Forms.Timer{Interval=90};timer.Tick+=Tick;timer.Start();
+        timer=new System.Windows.Forms.Timer{Interval=66};timer.Tick+=Tick;timer.Start();
         updateTimer=new System.Windows.Forms.Timer{Interval=15000};updateTimer.Tick+=async delegate{updateTimer.Interval=6*60*60*1000;if(settings.AutoUpdates){await updater.Check(true);RefreshUpdates();}};updateTimer.Start();
-        Native.SetWindowDisplayAffinity(studio.Handle,0x11);studio.Show();Native.ShowWindow(studio.Handle,5);
+        Native.SetWindowDisplayAffinity(studio.Handle,0x11);Open();
     }
-    void Apply(){pointer.Configure(settings.PointerStyle,settings.AutoColor?studio.Preview.LiveColor:settings.FixedColor,settings.PointerIntensity,settings.PointerSize,true);pointer.SetEnabled(settings.PointerEnabled&&!paused);}
-    void RefreshUpdates(){if(closing)return;studio.UpdateStatus.Text=updater.Message;studio.CheckUpdateButton.Enabled=!updater.Busy;studio.InstallUpdateButton.Enabled=updater.PendingFile!=null;}
-    void Toggle(){paused=!paused;pointer.SetEnabled(settings.PointerEnabled&&!paused);if(paused)foreach(var m in monitors)m.Hide();studio.Live(studio.Preview.LiveColor,paused);}
+    void Open(){studio.Show();Native.ShowWindow(studio.Handle,5);studio.Activate();}
+    void Configure(){
+        engine.Configure(new EngineConfig{Enabled=settings.ScreenEnabled||settings.VideoOnly,VideoOnly=settings.VideoOnly&&!settings.ScreenEnabled,AutoColor=settings.AutoColor,Cinema=settings.VideoBoost,Paused=paused,
+            Strength=settings.ScreenIntensity/100.0,Width=settings.Width/100.0,Fixed=settings.FixedColor});
+    }
+    void Apply(){Configure();pointer.Configure(settings.PointerStyle,settings.AutoColor?engine.State.Color:settings.FixedColor,settings.PointerIntensity,settings.PointerSize,true);pointer.SetEnabled(settings.PointerEnabled&&!paused);}
+    void RefreshUpdates(){if(!closing)studio.SetUpdate(updater.Message,updater.Busy,updater.PendingFile!=null);}
+    void Toggle(){paused=!paused;Configure();pointer.SetEnabled(settings.PointerEnabled&&!paused);studio.Live(engine.State.Color,paused);}
+    // The engine works on its own thread; the window only picks up its latest result here.
     void Tick(object sender,EventArgs e){
-        if(stop.WaitOne(0)){suppressUpdate=true;ExitThread();return;}if(show.WaitOne(0)){studio.Show();Native.ShowWindow(studio.Handle,5);studio.Activate();}RefreshUpdates();if(paused)return;
-        try{
-            string now="";foreach(var s in Screen.AllScreens)now+=s.Bounds.ToString();if(now!=topology){foreach(var m in monitors)m.Dispose();monitors.Clear();foreach(var s in Screen.AllScreens)monitors.Add(new MonitorGlow(s.Bounds));topology=now;}
-            foreach(var m in monitors)m.Update(settings.ScreenEnabled||settings.VideoOnly,settings.ScreenIntensity/100.0,settings.VideoBoost,settings.AutoColor,settings.FixedColor,settings.Width/100.0,settings.VideoOnly&&!settings.ScreenEnabled);
-            var active=monitors.Find(m=>m.Bounds.Contains(Cursor.Position));Color color=settings.AutoColor?(active==null?settings.FixedColor:active.Global):settings.FixedColor;
-            if(settings.PointerEnabled)pointer.Configure(settings.PointerStyle,color,settings.PointerIntensity,settings.PointerSize,false);
-            studio.Live(color,paused,active==null?null:active.PreviewFrame,active!=null&&active.VideoBoost>=.18);
-        }catch(Exception ex){if((DateTime.UtcNow-lastError).TotalSeconds>30){lastError=DateTime.UtcNow;studio.StateLabel.Text="Halo : "+ex.Message;try{File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"erreurs.log"),DateTime.UtcNow.ToString("s")+" "+ex+Environment.NewLine);}catch{}}}
+        if(stop.WaitOne(0)){suppressUpdate=true;ExitThread();return;}if(show.WaitOne(0))Open();RefreshUpdates();
+        engine.PreviewWanted=studio.PreviewVisible&&!paused;if(paused)return;
+        EngineState state=engine.State;Color color=settings.AutoColor?state.Color:settings.FixedColor;
+        try{if(settings.PointerEnabled)pointer.Configure(settings.PointerStyle,color,settings.PointerIntensity,settings.PointerSize,false);}catch(Exception ex){studio.SetStatus("Halo : "+ex.Message);}
+        studio.SetStatus(state.Error==null?null:"Halo : "+state.Error);
+        int[] frame=state.Preview==shown?null:state.Preview;shown=state.Preview;studio.Live(color,paused,frame,state.Video);
     }
-    protected override void ExitThreadCore(){if(closing)return;closing=true;timer.Stop();timer.Dispose();updateTimer.Stop();updateTimer.Dispose();pointer.Dispose();keys.Dispose();tray.Visible=false;tray.Dispose();show.Dispose();foreach(var m in monitors)m.Dispose();try{settings.Save();if(!suppressUpdate&&settings.AutoUpdates)updater.LaunchPending(false);}catch{}updater.Dispose();studio.AllowClose=true;studio.Dispose();base.ExitThreadCore();}
+    protected override void ExitThreadCore(){if(closing)return;closing=true;timer.Stop();timer.Dispose();updateTimer.Stop();updateTimer.Dispose();engine.Dispose();pointer.Dispose();keys.Dispose();tray.Visible=false;tray.Dispose();show.Dispose();try{settings.Save();if(!suppressUpdate&&settings.AutoUpdates)updater.LaunchPending(false);}catch{}updater.Dispose();studio.AllowClose=true;studio.Dispose();base.ExitThreadCore();}
 }

@@ -2,17 +2,24 @@
 
 <img src="logo.png" width="120" alt="Halo Studio">
 
-Application Windows de lumière ambiante : un halo qui suit les couleurs des applications et des vidéos, avec huit styles de pointeur lumineux. Les pointeurs main et texte suivent aussi le thème choisi.
+Application Windows de lumière ambiante : un halo qui suit les couleurs des applications et des vidéos, avec huit styles de pointeur lumineux appliqués aux dix-sept pointeurs de Windows (flèche, lien, texte, attente, aide, redimensionnement, déplacement…).
 
 ## Installer
 
-Télécharger **HaloStudio-Setup-1.0.0-beta.4.exe** depuis les [versions publiées](https://github.com/hassan312-god/halo-studio/releases), puis ouvrir l’installateur. Installation pour le compte courant, raccourci dans le menu Démarrer et raccourci bureau facultatif. Pas de droits administrateur requis.
+Télécharger **HaloStudio-Setup-1.0.0-beta.5.exe** depuis les [versions publiées](https://github.com/hassan312-god/halo-studio/releases), puis ouvrir l’installateur. Installation pour le compte courant, raccourci dans le menu Démarrer et raccourci bureau facultatif. Pas de droits administrateur requis.
 
 L’aperçu à droite montre une capture locale en direct de l’écran actif. Le halo est plus visible sur les pages claires, les changements de couleur sont lissés et un reflet glisse doucement sur les bords. Le halo vidéo est actif par défaut lorsqu’un contenu animé coloré est détecté ; le halo permanent est un réglage séparé. La luminosité matérielle du PC est réglable si Windows expose cette fonction.
 
 Windows 10 version 2004 ou ultérieure / Windows 11, .NET Framework 4.8 (fourni avec ces versions de Windows). PC portable ou de bureau, un ou plusieurs écrans.
 
 Cette bêta n’est pas signée avec un certificat Authenticode. Windows peut donc afficher un avertissement d’éditeur inconnu. Le SHA-256 de l’installateur est publié avec chaque version.
+
+## Nouveautés de la bêta 5
+
+- **Moteur** : capture, analyse et dessin sur un fil dédié, sans allocation par image ; jusqu’à 30 images par seconde pendant une vidéo, 10 sur un écran immobile. La fenêtre de réglages ne dépend plus du halo.
+- **Vidéo** : la zone de la vidéo est repérée (un défilement de page ne compte pas), les barres noires sont écartées, les couleurs sont lues bord par bord sur l’image ; réaction immédiate en plein écran. Le **mode cinéma** élargit et renforce le halo pendant les vidéos.
+- **Interface** : nouvelle fenêtre dans le style des Paramètres de Windows 11, avec accueil, recherche de réglages, thème clair ou sombre suivant Windows.
+- **Pointeurs** : les dix-sept pointeurs de Windows prennent le thème ; douze couleurs proposées.
 
 ## Réglages
 
